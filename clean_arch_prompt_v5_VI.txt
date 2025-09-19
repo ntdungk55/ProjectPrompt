@@ -278,18 +278,226 @@ docs/
 ============================================================================
 ## 7) TESTING & CHẤT LƯỢNG (CUNG CẤP STUBS)
 
-### 7.1 Testing Strategy
-- **Unit**: domain (no I/O). **Application**: use cases với mocked ports.
-- **Contract tests** per Port so all adapters pass the same specs.
-- **Integration/E2E** via interfaces; property‑based tests cho invariants (Hypothesis); mutation tests optional.
-- Enforce architecture với **import‑linter**; static typing via **mypy** (strict); lint/format via **ruff** (or Black+Ruff).
-- Complexity gates với **radon/xenon** (fail if function grade worse than B / CC > 10).
+### 7.1 Test Structure & Organization
 
-### 7.2 Quality Gates
+#### Test Directory Structure
+```
+tests/
+  domain/                    # Unit tests cho domain layer
+    test_entities.py
+    test_value_objects.py
+    test_services.py
+    test_enums.py
+  application/               # Application layer tests
+    test_use_cases.py
+    test_dto.py
+    test_ports.py
+  infrastructure/            # Infrastructure tests
+    test_adapters.py
+    test_repositories.py
+    test_http_client.py
+    <provider_name>/
+      test_adapters.py
+      test_acl.py
+  interfaces/                # Interface tests
+    test_rest_api.py
+    test_cli.py
+    test_mcp.py
+  integration/               # Integration tests
+    test_database.py
+    test_external_apis.py
+  e2e/                      # End-to-end tests
+    test_user_flows.py
+    test_business_scenarios.py
+  fixtures/                  # Test data và fixtures
+    domain_fixtures.py
+    application_fixtures.py
+    infrastructure_fixtures.py
+  conftest.py               # Pytest configuration
+```
+
+#### Test Naming Conventions
+- **Test files**: `test_<module_name>.py`
+- **Test classes**: `Test<ClassName>`
+- **Test methods**: `test_<behavior_description>`
+- **Fixtures**: `fixture_<purpose>`
+
+### 7.2 Testing Strategy Chi Tiết
+
+#### 7.2.1 Unit Tests (Domain Layer)
+- **Mục tiêu**: Test pure business logic, không I/O
+- **Coverage**: 100% cho domain entities, value objects, services
+- **Mocking**: Không cần mock, chỉ test logic thuần
+- **Examples**:
+  ```python
+  def test_user_creation_with_valid_data():
+      user = User.create(name="John", email="john@example.com")
+      assert user.name == "John"
+      assert user.email == "john@example.com"
+  
+  def test_user_creation_with_invalid_email_raises_error():
+      with pytest.raises(InvalidEmailError):
+          User.create(name="John", email="invalid-email")
+  ```
+
+#### 7.2.2 Application Layer Tests
+- **Mục tiêu**: Test use cases với mocked ports
+- **Coverage**: 100% cho use cases, 90% cho DTOs
+- **Mocking**: Mock tất cả external dependencies (repositories, gateways)
+- **Examples**:
+  ```python
+  def test_create_user_use_case_success(mock_user_repository):
+      use_case = CreateUserUseCase(mock_user_repository)
+      request = CreateUserRequestDto(name="John", email="john@example.com")
+      
+      result = use_case.execute(request)
+      
+      assert result.success is True
+      mock_user_repository.save.assert_called_once()
+  ```
+
+#### 7.2.3 Contract Tests
+- **Mục tiêu**: Đảm bảo tất cả adapters implement cùng interface
+- **Coverage**: 100% cho mỗi Port interface
+- **Tools**: pytest với custom markers
+- **Examples**:
+  ```python
+  @pytest.mark.contract
+  def test_user_repository_contract(user_repository):
+      # Test tất cả methods của UserRepository interface
+      assert hasattr(user_repository, 'save')
+      assert hasattr(user_repository, 'find_by_id')
+      assert hasattr(user_repository, 'find_by_email')
+  ```
+
+#### 7.2.4 Integration Tests
+- **Mục tiêu**: Test tương tác giữa các layers
+- **Coverage**: 80% cho critical paths
+- **Database**: Sử dụng test database (SQLite in-memory)
+- **External APIs**: Sử dụng WireMock hoặc VCR.py
+
+#### 7.2.5 End-to-End Tests
+- **Mục tiêu**: Test complete user workflows
+- **Coverage**: 70% cho main business scenarios
+- **Tools**: pytest với testcontainers cho external services
+
+### 7.3 Test Data Management
+
+#### 7.3.1 Fixtures Organization
+```python
+# tests/fixtures/domain_fixtures.py
+@pytest.fixture
+def sample_user():
+    return User.create(name="John Doe", email="john@example.com")
+
+@pytest.fixture
+def sample_users():
+    return [
+        User.create(name="User 1", email="user1@example.com"),
+        User.create(name="User 2", email="user2@example.com"),
+    ]
+```
+
+#### 7.3.2 Test Data Builders
+```python
+class UserBuilder:
+    def __init__(self):
+        self._name = "Default Name"
+        self._email = "default@example.com"
+    
+    def with_name(self, name):
+        self._name = name
+        return self
+    
+    def with_email(self, email):
+        self._email = email
+        return self
+    
+    def build(self):
+        return User.create(name=self._name, email=self._email)
+```
+
+### 7.4 Quality Metrics & Coverage
+
+#### 7.4.1 Coverage Requirements
+- **Domain Layer**: 100% coverage
+- **Application Layer**: 95% coverage
+- **Infrastructure Layer**: 85% coverage
+- **Interfaces Layer**: 80% coverage
+- **Overall Project**: 90% coverage
+
+#### 7.4.2 Performance Testing
+- **Response Time**: API endpoints < 200ms (95th percentile)
+- **Memory Usage**: < 100MB cho typical operations
+- **Database Queries**: < 10 queries per request
+- **Load Testing**: 100 concurrent users
+
+#### 7.4.3 Test Execution Rules
+- **Unit Tests**: Chạy trong < 5 giây
+- **Integration Tests**: Chạy trong < 30 giây
+- **E2E Tests**: Chạy trong < 2 phút
+- **Total Test Suite**: < 10 phút
+
+### 7.5 Test Tools & Configuration
+
+#### 7.5.1 Core Testing Tools
+```toml
+# pyproject.toml
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--cov=app",
+    "--cov-report=html",
+    "--cov-report=term-missing",
+    "--cov-fail-under=90"
+]
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "e2e: End-to-end tests",
+    "contract: Contract tests",
+    "slow: Slow running tests"
+]
+```
+
+#### 7.5.2 Test Dependencies
+```toml
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+pytest-cov = "^4.1.0"
+pytest-mock = "^3.11.0"
+pytest-asyncio = "^0.21.0"
+pytest-xdist = "^3.3.0"  # Parallel execution
+hypothesis = "^6.82.0"  # Property-based testing
+factory-boy = "^3.3.0"   # Test data factories
+testcontainers = "^3.7.0"  # Docker containers for tests
+```
+
+### 7.6 Quality Gates
+
+#### 7.6.1 Code Quality Gates
 - **Self‑Check** (AUTO‑GATE BEFORE RETURNING CODE):
   - R‑LEN‑001 (≤100 chars/line), R‑CMP‑010 (complexity), R‑RET‑003 (≤3 returns),
   - R‑ARGS‑006 (≤6 params), R‑FILE‑CLS‑001 (1 public class/file),
   - R‑GLOB‑002 (no globals), R‑DOC‑010 (docstrings/typing), R‑LAY‑ARCH‑100 (imports).
+
+#### 7.6.2 Test Quality Gates
+- **Test Coverage**: ≥ 90% overall
+- **Test Execution**: All tests must pass
+- **Test Performance**: Total suite < 10 minutes
+- **Test Reliability**: < 1% flaky tests
+- **Test Maintainability**: Clear test names and structure
+
+#### 7.6.3 Architecture Gates
+- **Import Rules**: Enforce layered imports với import-linter
+- **Static Typing**: 100% type coverage với mypy
+- **Code Formatting**: Consistent formatting với ruff/black
+- **Security**: No secrets in tests, proper test data isolation
 
 ============================================================================
 ## 8) TOOLING & CẤU HÌNH
