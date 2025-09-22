@@ -78,7 +78,29 @@ app/
     cli/                  # Typer/Click (optional)
     constants/            # UI-facing defaults (nếu có REST/CLI/MCP), ví dụ: display page_size
   di/
-    container.py
+    container.py              # Main DI container
+    providers/                # DI providers cho từng module
+      domain_provider.py      # Domain layer dependencies
+      application_provider.py # Application layer dependencies
+      infrastructure_provider.py # Infrastructure dependencies
+      interfaces_provider.py  # Interfaces dependencies
+    scopes/                   # DI scopes management
+      singleton_scope.py      # Singleton scope
+      transient_scope.py      # Transient scope
+      scoped_scope.py        # Scoped scope
+    factories/                # Factory patterns
+      repository_factory.py  # Repository factories
+      service_factory.py     # Service factories
+      gateway_factory.py     # Gateway factories
+    decorators/               # DI decorators
+      injectable.py          # Injectable decorator
+      singleton.py           # Singleton decorator
+      scoped.py              # Scoped decorator
+    exceptions/               # DI exceptions
+      di_exceptions.py       # DI-specific exceptions
+    utils/                    # DI utilities
+      type_checker.py        # Type checking utilities
+      instance_manager.py     # Instance lifecycle management
 ```
 
 ### 3.2 Cấu Trúc Hỗ Trợ
@@ -499,10 +521,1555 @@ testcontainers = "^3.7.0"  # Docker containers for tests
 - **Code Formatting**: Consistent formatting với ruff/black
 - **Security**: No secrets in tests, proper test data isolation
 
-============================================================================
-## 8) TOOLING & CẤU HÌNH
+### 7.7 Automated Testing Methods (Tự Động Hóa Testing)
 
-### 8.1 Core Tooling
+#### 7.7.1 Continuous Integration Testing
+- **GitHub Actions**: Tự động chạy tests trên mỗi commit/PR
+- **GitLab CI**: Pipeline testing với multiple stages
+- **Jenkins**: Enterprise CI/CD với custom workflows
+- **Azure DevOps**: Microsoft ecosystem integration
+
+#### 7.7.2 Automated Test Execution
+```yaml
+# .github/workflows/test.yml
+name: Automated Testing
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.11, 3.12]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+      - name: Run unit tests
+        run: pytest tests/domain/ -v --cov=app.domain
+      - name: Run integration tests
+        run: pytest tests/integration/ -v --cov=app.infrastructure
+      - name: Run E2E tests
+        run: pytest tests/e2e/ -v --cov=app.interfaces
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+```
+
+#### 7.7.3 Property-Based Testing (Tự Động Generate Test Cases)
+```python
+from hypothesis import given, strategies as st
+
+@given(st.text(min_size=1, max_size=100))
+def test_user_name_validation(name):
+    """Tự động test với random names"""
+    user = User.create(name=name, email="test@example.com")
+    assert len(user.name) <= 100
+    assert user.name.strip() == user.name
+
+@given(st.emails())
+def test_email_validation(email):
+    """Tự động test với random emails"""
+    if "@" in email and "." in email.split("@")[1]:
+        user = User.create(name="Test", email=email)
+        assert user.email == email
+    else:
+        with pytest.raises(InvalidEmailError):
+            User.create(name="Test", email=email)
+```
+
+#### 7.7.4 Mutation Testing (Tự Động Tìm Lỗi Test)
+```python
+# Sử dụng mutmut để tự động tìm test cases yếu
+# pip install mutmut
+# mutmut run --paths-to-mutate=app.domain
+```
+
+#### 7.7.5 Automated Performance Testing
+```python
+import pytest
+import time
+from concurrent.futures import ThreadPoolExecutor
+
+@pytest.mark.performance
+def test_api_response_time():
+    """Tự động test performance"""
+    start_time = time.time()
+    response = api_client.get("/users")
+    end_time = time.time()
+    
+    assert response.status_code == 200
+    assert (end_time - start_time) < 0.2  # < 200ms
+
+@pytest.mark.load
+def test_concurrent_users():
+    """Tự động test load với concurrent users"""
+    def make_request():
+        return api_client.get("/users")
+    
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = [executor.submit(make_request) for _ in range(100)]
+        results = [future.result() for future in futures]
+    
+    assert all(r.status_code == 200 for r in results)
+```
+
+#### 7.7.6 Automated Security Testing
+```python
+import pytest
+from bandit import run as bandit_run
+
+@pytest.mark.security
+def test_security_scan():
+    """Tự động scan security issues"""
+    issues = bandit_run(['app/'])
+    assert len(issues) == 0, f"Security issues found: {issues}"
+
+@pytest.mark.security
+def test_sql_injection_prevention():
+    """Tự động test SQL injection"""
+    malicious_input = "'; DROP TABLE users; --"
+    with pytest.raises(ValidationError):
+        user_service.create_user(name=malicious_input)
+```
+
+#### 7.7.7 Automated Regression Testing
+```python
+@pytest.mark.regression
+def test_existing_functionality():
+    """Tự động test regression cho existing features"""
+    # Test tất cả existing APIs
+    endpoints = ["/users", "/orders", "/products"]
+    for endpoint in endpoints:
+        response = api_client.get(endpoint)
+        assert response.status_code == 200
+        assert "data" in response.json()
+```
+
+#### 7.7.8 Automated Contract Testing
+```python
+@pytest.mark.contract
+def test_api_contract_compliance():
+    """Tự động test API contract"""
+    # Test OpenAPI spec compliance
+    from openapi_spec_validator import validate_spec
+    
+    with open("api_spec.yaml") as f:
+        spec = yaml.safe_load(f)
+    
+    validate_spec(spec)  # Tự động validate spec
+```
+
+#### 7.7.9 Automated Database Testing
+```python
+@pytest.mark.database
+def test_database_migrations():
+    """Tự động test database migrations"""
+    from alembic import command
+    from alembic.config import Config
+    
+    alembic_cfg = Config("alembic.ini")
+    command.upgrade(alembic_cfg, "head")
+    
+    # Test migration success
+    assert database.table_exists("users")
+    assert database.table_exists("orders")
+```
+
+#### 7.7.10 Automated Monitoring & Alerting
+```python
+@pytest.mark.monitoring
+def test_health_checks():
+    """Tự động test health checks"""
+    health_endpoints = [
+        "/health",
+        "/health/database",
+        "/health/redis",
+        "/health/external-apis"
+    ]
+    
+    for endpoint in health_endpoints:
+        response = api_client.get(endpoint)
+        assert response.status_code == 200
+        assert response.json()["status"] == "healthy"
+```
+
+### 7.8 Test Automation Tools & Setup
+
+#### 7.8.1 CI/CD Pipeline Configuration
+```yaml
+# .github/workflows/automated-testing.yml
+name: Automated Testing Pipeline
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run unit tests
+        run: pytest tests/domain/ -v --cov=app.domain --cov-report=xml
+      
+  integration-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Run integration tests
+        run: pytest tests/integration/ -v --cov=app.infrastructure
+        
+  e2e-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run E2E tests
+        run: pytest tests/e2e/ -v --cov=app.interfaces
+        
+  performance-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run performance tests
+        run: pytest tests/performance/ -v -m performance
+        
+  security-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run security tests
+        run: pytest tests/security/ -v -m security
+```
+
+#### 7.8.2 Test Data Automation
+```python
+# tests/fixtures/automated_fixtures.py
+import pytest
+from factory import Factory, Faker
+from app.domain.entities import User
+
+class UserFactory(Factory):
+    class Meta:
+        model = User
+    
+    name = Faker('name')
+    email = Faker('email')
+    created_at = Faker('date_time')
+
+@pytest.fixture
+def random_users():
+    """Tự động tạo random users cho testing"""
+    return UserFactory.build_batch(10)
+
+@pytest.fixture
+def realistic_test_data():
+    """Tự động tạo realistic test data"""
+    return {
+        'users': UserFactory.build_batch(100),
+        'orders': OrderFactory.build_batch(50),
+        'products': ProductFactory.build_batch(25)
+    }
+```
+
+#### 7.8.3 Automated Test Reporting
+```python
+# tests/conftest.py
+import pytest
+import json
+from datetime import datetime
+
+@pytest.hookimpl(tryfirst=True, hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    """Tự động tạo test reports"""
+    outcome = yield
+    rep = outcome.get_result()
+    
+    if rep.when == "call":
+        # Tự động log test results
+        test_result = {
+            "test_name": item.name,
+            "status": rep.outcome,
+            "duration": call.duration,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        with open("test_results.json", "a") as f:
+            f.write(json.dumps(test_result) + "\n")
+```
+
+### 7.9 Automated Testing Best Practices
+
+#### 7.9.1 Test Automation Strategy
+- **Test Pyramid**: 70% Unit, 20% Integration, 10% E2E
+- **Parallel Execution**: Chạy tests song song để tăng tốc
+- **Test Isolation**: Mỗi test độc lập, không phụ thuộc nhau
+- **Deterministic Tests**: Tests phải có kết quả nhất quán
+
+#### 7.9.2 Automated Test Maintenance
+- **Self-Healing Tests**: Tests tự động adapt với UI changes
+- **Test Data Management**: Tự động cleanup test data
+- **Flaky Test Detection**: Tự động detect và fix flaky tests
+- **Test Coverage Tracking**: Tự động track coverage trends
+
+#### 7.9.3 Automated Quality Gates
+- **Code Coverage**: Tự động fail nếu coverage < 90%
+- **Performance Regression**: Tự động fail nếu performance giảm
+- **Security Vulnerabilities**: Tự động fail nếu có security issues
+- **Dependency Updates**: Tự động test với updated dependencies
+
+### 7.10 Additional Testing Types (Các Loại Testing Bổ Sung)
+
+#### 7.10.1 Smoke Testing (Kiểm Tra Cơ Bản)
+```python
+@pytest.mark.smoke
+def test_basic_functionality():
+    """Smoke test - kiểm tra hệ thống có hoạt động cơ bản không"""
+    # Test main endpoints
+    endpoints = ["/health", "/api/v1/users", "/api/v1/orders"]
+    for endpoint in endpoints:
+        response = api_client.get(endpoint)
+        assert response.status_code in [200, 401]  # 401 OK nếu cần auth
+```
+
+#### 7.10.2 Sanity Testing (Kiểm Tra Hợp Lý)
+```python
+@pytest.mark.sanity
+def test_critical_business_flows():
+    """Sanity test - kiểm tra các flow nghiệp vụ quan trọng"""
+    # Test user registration flow
+    user_data = {"name": "Test User", "email": "test@example.com"}
+    response = api_client.post("/api/v1/users", json=user_data)
+    assert response.status_code == 201
+    
+    # Test user login
+    login_data = {"email": "test@example.com", "password": "password"}
+    response = api_client.post("/api/v1/auth/login", json=login_data)
+    assert response.status_code == 200
+```
+
+#### 7.10.3 Exploratory Testing (Kiểm Tra Khám Phá)
+```python
+@pytest.mark.exploratory
+def test_edge_cases():
+    """Exploratory test - kiểm tra các trường hợp biên"""
+    # Test với dữ liệu cực đại
+    large_name = "A" * 1000
+    response = api_client.post("/api/v1/users", json={"name": large_name})
+    assert response.status_code == 400  # Should reject
+    
+    # Test với dữ liệu rỗng
+    response = api_client.post("/api/v1/users", json={})
+    assert response.status_code == 400
+```
+
+#### 7.10.4 Accessibility Testing (Kiểm Tra Truy Cập)
+```python
+@pytest.mark.accessibility
+def test_api_accessibility():
+    """Accessibility test - kiểm tra API có accessible không"""
+    # Test CORS headers
+    response = api_client.options("/api/v1/users")
+    assert "Access-Control-Allow-Origin" in response.headers
+    
+    # Test API versioning
+    response = api_client.get("/api/v1/users")
+    assert response.status_code == 200
+```
+
+#### 7.10.5 Compatibility Testing (Kiểm Tra Tương Thích)
+```python
+@pytest.mark.compatibility
+def test_api_compatibility():
+    """Compatibility test - kiểm tra tương thích với các client"""
+    # Test với different content types
+    headers = {"Content-Type": "application/json"}
+    response = api_client.get("/api/v1/users", headers=headers)
+    assert response.status_code == 200
+    
+    # Test với different user agents
+    headers = {"User-Agent": "Mobile App 1.0"}
+    response = api_client.get("/api/v1/users", headers=headers)
+    assert response.status_code == 200
+```
+
+#### 7.10.6 Usability Testing (Kiểm Tra Khả Năng Sử Dụng)
+```python
+@pytest.mark.usability
+def test_api_usability():
+    """Usability test - kiểm tra API có dễ sử dụng không"""
+    # Test error messages are clear
+    response = api_client.post("/api/v1/users", json={"invalid": "data"})
+    assert response.status_code == 400
+    error_data = response.json()
+    assert "error" in error_data
+    assert "message" in error_data["error"]
+```
+
+#### 7.10.7 Recovery Testing (Kiểm Tra Phục Hồi)
+```python
+@pytest.mark.recovery
+def test_system_recovery():
+    """Recovery test - kiểm tra hệ thống có phục hồi được không"""
+    # Test database connection recovery
+    database.disconnect()
+    database.connect()
+    
+    response = api_client.get("/api/v1/users")
+    assert response.status_code == 200
+```
+
+#### 7.10.8 Stress Testing (Kiểm Tra Áp Lực)
+```python
+@pytest.mark.stress
+def test_system_under_stress():
+    """Stress test - kiểm tra hệ thống dưới áp lực cao"""
+    import threading
+    import time
+    
+    def make_requests():
+        for _ in range(50):
+            response = api_client.get("/api/v1/users")
+            assert response.status_code in [200, 429]  # 429 = rate limited
+    
+    threads = []
+    for _ in range(10):  # 10 threads, 50 requests each = 500 requests
+        thread = threading.Thread(target=make_requests)
+        threads.append(thread)
+        thread.start()
+    
+    for thread in threads:
+        thread.join()
+```
+
+#### 7.10.9 Volume Testing (Kiểm Tra Khối Lượng)
+```python
+@pytest.mark.volume
+def test_large_data_handling():
+    """Volume test - kiểm tra xử lý dữ liệu lớn"""
+    # Test với large dataset
+    large_data = [{"name": f"User {i}", "email": f"user{i}@example.com"} 
+                  for i in range(1000)]
+    
+    response = api_client.post("/api/v1/users/bulk", json=large_data)
+    assert response.status_code == 200
+```
+
+#### 7.10.10 Scalability Testing (Kiểm Tra Khả Năng Mở Rộng)
+```python
+@pytest.mark.scalability
+def test_system_scalability():
+    """Scalability test - kiểm tra khả năng mở rộng"""
+    # Test với increasing load
+    for concurrent_users in [1, 5, 10, 20]:
+        start_time = time.time()
+        
+        with ThreadPoolExecutor(max_workers=concurrent_users) as executor:
+            futures = [executor.submit(api_client.get, "/api/v1/users") 
+                      for _ in range(concurrent_users)]
+            results = [future.result() for future in futures]
+        
+        end_time = time.time()
+        response_time = end_time - start_time
+        
+        # Response time should not degrade significantly
+        assert response_time < 2.0  # Max 2 seconds for any load
+        assert all(r.status_code == 200 for r in results)
+```
+
+#### 7.10.11 Reliability Testing (Kiểm Tra Độ Tin Cậy)
+```python
+@pytest.mark.reliability
+def test_system_reliability():
+    """Reliability test - kiểm tra độ tin cậy hệ thống"""
+    # Test multiple requests to ensure consistency
+    responses = []
+    for _ in range(100):
+        response = api_client.get("/api/v1/users")
+        responses.append(response.status_code)
+    
+    # All requests should succeed
+    assert all(status == 200 for status in responses)
+```
+
+#### 7.10.12 Maintainability Testing (Kiểm Tra Khả Năng Bảo Trì)
+```python
+@pytest.mark.maintainability
+def test_code_maintainability():
+    """Maintainability test - kiểm tra code có dễ bảo trì không"""
+    # Test code complexity
+    from radon.complexity import cc_visit
+    
+    with open("app/domain/entities.py", "r") as f:
+        code = f.read()
+    
+    complexity = cc_visit(code)
+    for block in complexity:
+        assert block.complexity <= 10  # Max complexity
+```
+
+### 7.11 Testing Pyramid Chi Tiết
+
+#### 7.11.1 Unit Tests (70% - Foundation)
+- **Domain Layer**: 100% coverage
+- **Pure business logic**: No I/O, no dependencies
+- **Fast execution**: < 1ms per test
+- **Isolated**: No external dependencies
+
+#### 7.11.2 Integration Tests (20% - Middle Layer)
+- **Application Layer**: Use cases với mocked ports
+- **Infrastructure Layer**: Database, external APIs
+- **Medium execution**: < 100ms per test
+- **Focused**: Test specific integrations
+
+#### 7.11.3 End-to-End Tests (10% - Top Layer)
+- **Complete workflows**: User journeys
+- **Real dependencies**: Database, external services
+- **Slow execution**: < 5s per test
+- **Comprehensive**: Test entire system
+
+### 7.12 Testing Strategy Matrix
+
+| Test Type | Coverage | Speed | Isolation | Dependencies |
+|-----------|----------|-------|-----------|--------------|
+| Unit | 100% | Fast | High | None |
+| Integration | 80% | Medium | Medium | Mocked |
+| E2E | 70% | Slow | Low | Real |
+| Performance | 60% | Variable | Low | Real |
+| Security | 90% | Fast | High | None |
+| Regression | 80% | Medium | Medium | Mocked |
+
+### 7.13 Automated Test Execution Strategy
+
+#### 7.13.1 Pre-commit Hooks
+```yaml
+# .pre-commit-config.yaml
+repos:
+  - repo: local
+    hooks:
+      - id: unit-tests
+        name: Run unit tests
+        entry: pytest tests/domain/ -v
+        language: system
+        pass_filenames: false
+        always_run: true
+      
+      - id: linting
+        name: Run linting
+        entry: ruff check app/
+        language: system
+        pass_filenames: false
+        always_run: true
+```
+
+#### 7.13.2 CI/CD Pipeline Stages
+1. **Lint & Format**: Code quality checks
+2. **Unit Tests**: Fast feedback loop
+3. **Integration Tests**: Medium complexity
+4. **E2E Tests**: Full system validation
+5. **Performance Tests**: Load and stress testing
+6. **Security Tests**: Vulnerability scanning
+7. **Deployment Tests**: Production-like environment
+
+#### 7.13.3 Test Execution Triggers
+- **On every commit**: Unit tests, linting
+- **On PR creation**: Integration tests, security scans
+- **On merge to main**: Full test suite, performance tests
+- **Scheduled**: Regression tests, dependency updates
+- **Manual**: Stress tests, exploratory testing
+
+### 7.14 Missing Testing Types (Các Loại Testing Còn Thiếu)
+
+#### 7.14.1 Black Box Testing (Kiểm Tra Hộp Đen)
+```python
+@pytest.mark.blackbox
+def test_api_blackbox():
+    """Black box test - test API từ bên ngoài, không biết implementation"""
+    # Test API endpoints như user thực tế
+    response = api_client.get("/api/v1/users")
+    assert response.status_code == 200
+    assert "users" in response.json()
+    
+    # Test error handling
+    response = api_client.get("/api/v1/nonexistent")
+    assert response.status_code == 404
+```
+
+#### 7.14.2 White Box Testing (Kiểm Tra Hộp Trắng)
+```python
+@pytest.mark.whitebox
+def test_domain_logic_whitebox():
+    """White box test - test internal logic và implementation"""
+    # Test internal methods và logic
+    user = User.create(name="Test", email="test@example.com")
+    
+    # Test internal state
+    assert user._id is not None
+    assert user._created_at is not None
+    assert user._is_active is True
+    
+    # Test internal validation logic
+    with pytest.raises(ValueError):
+        user._validate_email("invalid-email")
+```
+
+#### 7.14.3 Gray Box Testing (Kiểm Tra Hộp Xám)
+```python
+@pytest.mark.graybox
+def test_api_graybox():
+    """Gray box test - kết hợp black box và white box"""
+    # Test API behavior (black box)
+    response = api_client.post("/api/v1/users", json={"name": "Test"})
+    assert response.status_code == 201
+    
+    # Test internal state changes (white box)
+    user_id = response.json()["id"]
+    user = user_repository.find_by_id(user_id)
+    assert user.name == "Test"
+    assert user.is_active is True
+```
+
+#### 7.14.4 Acceptance Testing (Kiểm Tra Chấp Nhận)
+```python
+@pytest.mark.acceptance
+def test_user_registration_acceptance():
+    """Acceptance test - test user story từ góc độ business"""
+    # Given: User muốn đăng ký tài khoản
+    user_data = {
+        "name": "John Doe",
+        "email": "john@example.com",
+        "password": "secure123"
+    }
+    
+    # When: User submit registration form
+    response = api_client.post("/api/v1/users/register", json=user_data)
+    
+    # Then: User nhận được confirmation
+    assert response.status_code == 201
+    assert "user_id" in response.json()
+    assert "confirmation_email_sent" in response.json()
+```
+
+#### 7.14.5 System Testing (Kiểm Tra Hệ Thống)
+```python
+@pytest.mark.system
+def test_complete_system_workflow():
+    """System test - test toàn bộ hệ thống end-to-end"""
+    # Test complete user journey
+    # 1. User registration
+    user_data = {"name": "Test User", "email": "test@example.com"}
+    reg_response = api_client.post("/api/v1/users", json=user_data)
+    assert reg_response.status_code == 201
+    
+    # 2. User login
+    login_data = {"email": "test@example.com", "password": "password"}
+    login_response = api_client.post("/api/v1/auth/login", json=login_data)
+    assert login_response.status_code == 200
+    
+    # 3. User creates order
+    token = login_response.json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    order_data = {"product_id": 1, "quantity": 2}
+    order_response = api_client.post("/api/v1/orders", json=order_data, headers=headers)
+    assert order_response.status_code == 201
+```
+
+#### 7.14.6 Functional Testing (Kiểm Tra Chức Năng)
+```python
+@pytest.mark.functional
+def test_user_management_functionality():
+    """Functional test - test các chức năng cụ thể"""
+    # Test user creation functionality
+    user = user_service.create_user("John", "john@example.com")
+    assert user.name == "John"
+    assert user.email == "john@example.com"
+    
+    # Test user update functionality
+    updated_user = user_service.update_user(user.id, name="John Updated")
+    assert updated_user.name == "John Updated"
+    
+    # Test user deletion functionality
+    user_service.delete_user(user.id)
+    assert user_service.get_user(user.id) is None
+```
+
+#### 7.14.7 Non-Functional Testing (Kiểm Tra Phi Chức Năng)
+```python
+@pytest.mark.nonfunctional
+def test_system_non_functional_requirements():
+    """Non-functional test - test các yêu cầu phi chức năng"""
+    # Test performance requirements
+    start_time = time.time()
+    response = api_client.get("/api/v1/users")
+    response_time = time.time() - start_time
+    assert response_time < 0.5  # < 500ms
+    
+    # Test scalability requirements
+    concurrent_requests = 100
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = [executor.submit(api_client.get, "/api/v1/users") 
+                  for _ in range(concurrent_requests)]
+        results = [future.result() for future in futures]
+    
+    assert all(r.status_code == 200 for r in results)
+    
+    # Test reliability requirements
+    for _ in range(10):
+        response = api_client.get("/api/v1/health")
+        assert response.status_code == 200
+```
+
+#### 7.14.8 Boundary Testing (Kiểm Tra Biên)
+```python
+@pytest.mark.boundary
+def test_boundary_conditions():
+    """Boundary test - test các điều kiện biên"""
+    # Test minimum values
+    user = User.create(name="A", email="a@b.co")  # Minimum valid values
+    assert user.name == "A"
+    assert user.email == "a@b.co"
+    
+    # Test maximum values
+    long_name = "A" * 100  # Maximum allowed length
+    user = User.create(name=long_name, email="test@example.com")
+    assert len(user.name) == 100
+    
+    # Test boundary edge cases
+    with pytest.raises(ValueError):
+        User.create(name="", email="test@example.com")  # Empty name
+    
+    with pytest.raises(ValueError):
+        User.create(name="A" * 101, email="test@example.com")  # Too long
+```
+
+#### 7.14.9 Equivalence Partitioning Testing (Kiểm Tra Phân Vùng Tương Đương)
+```python
+@pytest.mark.equivalence
+def test_equivalence_partitions():
+    """Equivalence partitioning test - test các nhóm tương đương"""
+    # Valid equivalence class
+    valid_emails = [
+        "user@example.com",
+        "test.user@domain.co.uk",
+        "user+tag@example.org"
+    ]
+    
+    for email in valid_emails:
+        user = User.create(name="Test", email=email)
+        assert user.email == email
+    
+    # Invalid equivalence class
+    invalid_emails = [
+        "invalid-email",
+        "@example.com",
+        "user@",
+        "user@.com"
+    ]
+    
+    for email in invalid_emails:
+        with pytest.raises(ValueError):
+            User.create(name="Test", email=email)
+```
+
+#### 7.14.10 Decision Table Testing (Kiểm Tra Bảng Quyết Định)
+```python
+@pytest.mark.decision_table
+def test_user_permissions_decision_table():
+    """Decision table test - test các quyết định dựa trên điều kiện"""
+    # Test user permission matrix
+    test_cases = [
+        # (user_type, resource, action, expected_result)
+        ("admin", "users", "read", True),
+        ("admin", "users", "write", True),
+        ("admin", "users", "delete", True),
+        ("user", "users", "read", True),
+        ("user", "users", "write", False),
+        ("user", "users", "delete", False),
+        ("guest", "users", "read", False),
+        ("guest", "users", "write", False),
+        ("guest", "users", "delete", False),
+    ]
+    
+    for user_type, resource, action, expected in test_cases:
+        user = User.create(name="Test", email="test@example.com", type=user_type)
+        has_permission = permission_service.check_permission(user, resource, action)
+        assert has_permission == expected
+```
+
+#### 7.14.11 State Transition Testing (Kiểm Tra Chuyển Đổi Trạng Thái)
+```python
+@pytest.mark.state_transition
+def test_order_state_transitions():
+    """State transition test - test các chuyển đổi trạng thái"""
+    # Test valid state transitions
+    order = Order.create(customer_id=1, product_id=1)
+    assert order.status == OrderStatus.PENDING
+    
+    # PENDING -> CONFIRMED
+    order.confirm()
+    assert order.status == OrderStatus.CONFIRMED
+    
+    # CONFIRMED -> SHIPPED
+    order.ship()
+    assert order.status == OrderStatus.SHIPPED
+    
+    # SHIPPED -> DELIVERED
+    order.deliver()
+    assert order.status == OrderStatus.DELIVERED
+    
+    # Test invalid state transitions
+    with pytest.raises(InvalidStateTransitionError):
+        order.cancel()  # Cannot cancel delivered order
+```
+
+#### 7.14.12 Error Guessing Testing (Kiểm Tra Đoán Lỗi)
+```python
+@pytest.mark.error_guessing
+def test_common_error_scenarios():
+    """Error guessing test - test các lỗi thường gặp"""
+    # Test common input errors
+    with pytest.raises(ValidationError):
+        api_client.post("/api/v1/users", json={"name": None})
+    
+    with pytest.raises(ValidationError):
+        api_client.post("/api/v1/users", json={"email": "invalid"})
+    
+    # Test common business logic errors
+    with pytest.raises(BusinessLogicError):
+        user_service.create_user("", "test@example.com")  # Empty name
+    
+    # Test common system errors
+    with pytest.raises(DatabaseError):
+        # Simulate database connection failure
+        database.disconnect()
+        user_service.create_user("Test", "test@example.com")
+```
+
+### 7.15 Testing Tools & Frameworks
+
+#### 7.15.1 Web Testing Tools
+- **Selenium**: Web UI automation
+- **Playwright**: Modern web testing
+- **Cypress**: Frontend testing framework
+
+#### 7.15.2 API Testing Tools
+- **Postman**: API testing và documentation
+- **Newman**: Command-line Postman
+- **RestAssured**: Java API testing
+
+#### 7.15.3 Performance Testing Tools
+- **JMeter**: Load testing
+- **Gatling**: High-performance load testing
+- **K6**: Developer-centric load testing
+
+#### 7.15.4 Security Testing Tools
+- **OWASP ZAP**: Security vulnerability scanner
+- **Burp Suite**: Web application security testing
+- **Nessus**: Vulnerability assessment
+
+### 7.16 Testing Metrics & KPIs
+
+#### 7.16.1 Test Coverage Metrics
+- **Line Coverage**: 90% minimum
+- **Branch Coverage**: 85% minimum
+- **Function Coverage**: 95% minimum
+- **Statement Coverage**: 90% minimum
+
+#### 7.16.2 Test Quality Metrics
+- **Test Pass Rate**: 95% minimum
+- **Test Execution Time**: < 10 minutes
+- **Flaky Test Rate**: < 1%
+- **Test Maintenance Effort**: < 20% of development time
+
+#### 7.16.3 Business Impact Metrics
+- **Bug Escape Rate**: < 5%
+- **Production Defect Rate**: < 2%
+- **Mean Time to Detection**: < 1 hour
+- **Mean Time to Resolution**: < 4 hours
+
+### 7.17 Testing Rules & Standards (Quy Tắc & Tiêu Chuẩn Testing)
+
+#### 7.17.1 Unit Testing Rules
+
+##### 7.17.1.1 Input Requirements (Yêu Cầu Đầu Vào)
+- **Domain entities**: Pure business objects, no I/O
+- **Value objects**: Immutable data containers
+- **Domain services**: Business logic functions
+- **Enums**: Fixed value sets
+
+##### 7.17.1.2 Output Requirements (Yêu Cầu Đầu Ra)
+- **Test results**: Pass/Fail với detailed error messages
+- **Coverage report**: 100% line coverage cho domain
+- **Performance metrics**: < 1ms per test
+- **Test data**: Clean, isolated test data
+
+##### 7.17.1.3 Compliance Rules (Quy Tắc Tuân Thủ)
+- **No external dependencies**: Không import database, HTTP, file system
+- **Deterministic**: Same input → same output
+- **Fast execution**: < 1ms per test
+- **Isolated**: Tests không ảnh hưởng nhau
+
+##### 7.17.1.4 File Structure (Cấu Trúc File)
+```
+tests/domain/
+  test_entities.py          # Test domain entities
+  test_value_objects.py     # Test value objects  
+  test_services.py          # Test domain services
+  test_enums.py            # Test domain enums
+  fixtures/
+    domain_fixtures.py     # Domain test data
+```
+
+##### 7.17.1.5 Naming Convention (Quy Tắc Đặt Tên)
+- **Test files**: `test_<entity_name>.py`
+- **Test classes**: `Test<UserEntity>`
+- **Test methods**: `test_<behavior>_<expected_result>`
+- **Fixtures**: `fixture_<purpose>`
+
+#### 7.17.2 Integration Testing Rules
+
+##### 7.17.2.1 Input Requirements
+- **Use cases**: Application layer business logic
+- **Ports**: Interface definitions
+- **DTOs**: Data transfer objects
+- **External services**: Mocked dependencies
+
+##### 7.17.2.2 Output Requirements
+- **Integration results**: Pass/Fail với integration details
+- **Coverage report**: 80% coverage cho application layer
+- **Performance metrics**: < 100ms per test
+- **Mock verification**: Verify external service calls
+
+##### 7.17.2.3 Compliance Rules
+- **Mock external dependencies**: Database, HTTP, file system
+- **Test layer interactions**: Domain ↔ Application ↔ Infrastructure
+- **Verify contracts**: Port implementations
+- **Isolated test data**: Each test có own data
+
+##### 7.17.2.4 File Structure
+```
+tests/application/
+  test_use_cases.py         # Test use cases
+  test_ports.py            # Test port interfaces
+  test_dto.py              # Test DTOs
+  fixtures/
+    application_fixtures.py # Application test data
+```
+
+##### 7.17.2.5 Naming Convention
+- **Test files**: `test_<use_case_name>.py`
+- **Test classes**: `Test<UseCaseName>`
+- **Test methods**: `test_<scenario>_<expected_outcome>`
+- **Mocks**: `mock_<service_name>`
+
+#### 7.17.3 End-to-End Testing Rules
+
+##### 7.17.3.1 Input Requirements
+- **Complete user workflows**: Registration → Login → Action → Logout
+- **Real dependencies**: Database, external APIs
+- **Production-like data**: Realistic test scenarios
+- **Multiple user types**: Admin, user, guest
+
+##### 7.17.3.2 Output Requirements
+- **E2E results**: Pass/Fail với workflow details
+- **Coverage report**: 70% coverage cho interfaces
+- **Performance metrics**: < 5s per test
+- **User journey validation**: Complete workflow verification
+
+##### 7.17.3.3 Compliance Rules
+- **Real dependencies**: Production-like environment
+- **Complete workflows**: End-to-end user journeys
+- **Data cleanup**: Clean up after each test
+- **Environment isolation**: Separate test environment
+
+##### 7.17.3.4 File Structure
+```
+tests/e2e/
+  test_user_flows.py        # Complete user workflows
+  test_business_scenarios.py # Business scenarios
+  test_api_workflows.py    # API workflow tests
+  fixtures/
+    e2e_fixtures.py        # E2E test data
+```
+
+##### 7.17.3.5 Naming Convention
+- **Test files**: `test_<workflow_name>.py`
+- **Test classes**: `Test<UserWorkflow>`
+- **Test methods**: `test_<user_journey>_<expected_outcome>`
+- **Fixtures**: `fixture_<workflow_data>`
+
+#### 7.17.4 Performance Testing Rules
+
+##### 7.17.4.1 Input Requirements
+- **Load scenarios**: 100, 500, 1000 concurrent users
+- **Data volumes**: Large datasets (10K, 100K records)
+- **Time constraints**: Response time limits
+- **Resource limits**: Memory, CPU constraints
+
+##### 7.17.4.2 Output Requirements
+- **Performance metrics**: Response time, throughput, resource usage
+- **Load test results**: Pass/Fail với performance details
+- **Bottleneck identification**: Performance bottlenecks
+- **Scalability analysis**: System scaling limits
+
+##### 7.17.4.3 Compliance Rules
+- **Realistic load**: Production-like load patterns
+- **Baseline establishment**: Performance baselines
+- **Threshold validation**: Performance thresholds
+- **Resource monitoring**: CPU, memory, network usage
+
+##### 7.17.4.4 File Structure
+```
+tests/performance/
+  test_load.py             # Load testing
+  test_stress.py          # Stress testing
+  test_volume.py          # Volume testing
+  test_scalability.py     # Scalability testing
+  fixtures/
+    performance_fixtures.py # Performance test data
+```
+
+##### 7.17.4.5 Naming Convention
+- **Test files**: `test_<performance_type>.py`
+- **Test classes**: `Test<PerformanceType>`
+- **Test methods**: `test_<load_scenario>_<expected_performance>`
+- **Fixtures**: `fixture_<performance_data>`
+
+#### 7.17.5 Security Testing Rules
+
+##### 7.17.5.1 Input Requirements
+- **Security scenarios**: SQL injection, XSS, CSRF
+- **Authentication tests**: Login, logout, session management
+- **Authorization tests**: Role-based access control
+- **Data protection**: PII, sensitive data handling
+
+##### 7.17.5.2 Output Requirements
+- **Security scan results**: Vulnerability reports
+- **Penetration test results**: Security assessment
+- **Compliance validation**: Security standards compliance
+- **Threat analysis**: Security threat identification
+
+##### 7.17.5.3 Compliance Rules
+- **OWASP compliance**: OWASP Top 10 security risks
+- **Data protection**: GDPR, CCPA compliance
+- **Authentication**: Multi-factor authentication
+- **Authorization**: Role-based access control
+
+##### 7.17.5.4 File Structure
+```
+tests/security/
+  test_authentication.py   # Authentication tests
+  test_authorization.py   # Authorization tests
+  test_data_protection.py # Data protection tests
+  test_vulnerabilities.py # Vulnerability tests
+  fixtures/
+    security_fixtures.py  # Security test data
+```
+
+##### 7.17.5.5 Naming Convention
+- **Test files**: `test_<security_aspect>.py`
+- **Test classes**: `Test<SecurityAspect>`
+- **Test methods**: `test_<security_scenario>_<expected_behavior>`
+- **Fixtures**: `fixture_<security_data>`
+
+#### 7.17.6 Automated Testing Rules
+
+##### 7.17.6.1 Input Requirements
+- **CI/CD triggers**: Commit, PR, merge events
+- **Test data**: Automated test data generation
+- **Environment setup**: Automated environment provisioning
+- **Dependency management**: Automated dependency updates
+
+##### 7.17.6.2 Output Requirements
+- **Automated reports**: Test execution reports
+- **Coverage reports**: Automated coverage analysis
+- **Performance reports**: Automated performance analysis
+- **Security reports**: Automated security scanning
+
+##### 7.17.6.3 Compliance Rules
+- **Automated execution**: No manual intervention
+- **Consistent results**: Reproducible test results
+- **Fast feedback**: Quick test execution
+- **Reliable execution**: Minimal flaky tests
+
+##### 7.17.6.4 File Structure
+```
+.github/workflows/
+  test.yml                # Main test workflow
+  performance.yml         # Performance test workflow
+  security.yml           # Security test workflow
+  deploy.yml             # Deployment test workflow
+```
+
+##### 7.17.6.5 Naming Convention
+- **Workflow files**: `<test_type>.yml`
+- **Job names**: `<test_category>_tests`
+- **Step names**: `<action>_<test_type>`
+- **Artifact names**: `<test_type>_results`
+
+### 7.18 Testing Standards & Best Practices
+
+#### 7.18.1 Test Data Management
+- **Test data isolation**: Mỗi test có own data
+- **Data cleanup**: Clean up after each test
+- **Data privacy**: No real user data in tests
+- **Data consistency**: Consistent test data across environments
+
+#### 7.18.2 Test Environment Management
+- **Environment isolation**: Separate test environments
+- **Environment consistency**: Same config across environments
+- **Environment provisioning**: Automated environment setup
+- **Environment cleanup**: Automated environment cleanup
+
+#### 7.18.3 Test Execution Management
+- **Parallel execution**: Run tests in parallel
+- **Test prioritization**: Critical tests first
+- **Test scheduling**: Scheduled test execution
+- **Test monitoring**: Monitor test execution
+
+#### 7.18.4 Test Reporting Management
+- **Test reports**: Comprehensive test reports
+- **Coverage reports**: Code coverage analysis
+- **Performance reports**: Performance analysis
+- **Security reports**: Security analysis
+
+#### 7.18.5 Test Maintenance Management
+- **Test maintenance**: Regular test updates
+- **Test refactoring**: Test code refactoring
+- **Test optimization**: Test performance optimization
+- **Test documentation**: Test documentation updates
+
+============================================================================
+## 8) DEPENDENCY INJECTION RULES & PATTERNS (QUY TẮC DI)
+
+### 8.1 DI Architecture Principles
+
+#### 8.1.1 Layered DI Container Structure
+- **Main Container**: `di/container.py` - Central DI registry
+- **Module Providers**: `di/providers/` - Layer-specific dependency registration
+- **Scope Management**: `di/scopes/` - Instance lifecycle management
+- **Factory Patterns**: `di/factories/` - Complex object creation
+- **Decorators**: `di/decorators/` - DI annotations và metadata
+
+#### 8.1.2 DI Scope Management
+- **Singleton**: 1 instance cho toàn bộ application lifecycle
+- **Transient**: New instance mỗi lần request
+- **Scoped**: 1 instance per request/operation scope
+- **Custom Scopes**: Business-specific scopes (per user, per session)
+
+### 8.2 DI Registration Rules
+
+#### 8.2.1 Domain Layer Registration
+```python
+# di/providers/domain_provider.py
+class DomainProvider:
+    def register_domain_services(self):
+        # Domain services - Singleton scope
+        self.container.register_singleton(UserService)
+        self.container.register_singleton(OrderService)
+        
+        # Domain entities - Transient scope (stateless)
+        self.container.register_transient(User)
+        self.container.register_transient(Order)
+```
+
+#### 8.2.2 Application Layer Registration
+```python
+# di/providers/application_provider.py
+class ApplicationProvider:
+    def register_application_services(self):
+        # Use cases - Transient scope (stateless)
+        self.container.register_transient(CreateUser)
+        self.container.register_transient(GetUser)
+        
+        # Ports - Interface registration
+        self.container.register_interface(UserRepository)
+        self.container.register_interface(OrderRepository)
+```
+
+#### 8.2.3 Infrastructure Layer Registration
+```python
+# di/providers/infrastructure_provider.py
+class InfrastructureProvider:
+    def register_infrastructure_services(self):
+        # Repositories - Scoped scope (per request)
+        self.container.register_scoped(UserSqlRepository, UserRepository)
+        self.container.register_scoped(OrderSqlRepository, OrderRepository)
+        
+        # HTTP Client - Singleton scope
+        self.container.register_singleton(HttpClient)
+        
+        # Cache - Singleton scope
+        self.container.register_singleton(RedisCache)
+```
+
+### 8.3 DI Instance Management Rules
+
+#### 8.3.1 Instance Lifecycle Management
+- **Singleton**: 1 instance cho toàn bộ app lifecycle
+- **Transient**: New instance mỗi lần resolve
+- **Scoped**: 1 instance per scope (request, session, user)
+- **Custom Scopes**: Business-specific scopes
+
+#### 8.3.2 Null Pointer Prevention
+- **Always validate**: Check dependencies before use
+- **Type checking**: Validate dependency types
+- **Default values**: Provide sensible defaults
+- **Error handling**: Graceful degradation
+
+#### 8.3.3 Memory Management
+- **Weak references**: Use weakref for cleanup
+- **Garbage collection**: Regular cleanup of unused instances
+- **Memory monitoring**: Track instance counts
+- **Leak detection**: Detect memory leaks
+
+### 8.4 DI Best Practices
+
+#### 8.4.1 Dependency Registration Order
+1. **Domain Layer**: Register domain services first
+2. **Application Layer**: Register use cases và ports
+3. **Infrastructure Layer**: Register implementations
+4. **Interfaces Layer**: Register controllers và handlers
+
+#### 8.4.2 Instance Cleanup Rules
+- **Singleton**: Clean up khi application shutdown
+- **Transient**: Automatic garbage collection
+- **Scoped**: Clean up khi scope ends
+- **Custom Scopes**: Clean up theo business rules
+
+#### 8.4.3 Performance Optimization
+- **Lazy loading**: Create instances only when needed
+- **Caching**: Cache frequently used instances
+- **Memory management**: Regular cleanup of unused instances
+- **Thread safety**: Thread-safe instance management
+
+### 8.5 DI Implementation Examples
+
+#### 8.5.1 Main DI Container
+```python
+# di/container.py
+from typing import Dict, Any, Type, TypeVar, Optional, Callable
+import threading
+from abc import ABC, abstractmethod
+
+T = TypeVar('T')
+
+class DIContainer:
+    def __init__(self):
+        self._registrations: Dict[str, Dict[str, Any]] = {}
+        self._instances: Dict[str, Any] = {}
+        self._lock = threading.Lock()
+    
+    def register_singleton(self, interface: Type[T], implementation: Type[T] = None):
+        """Register singleton scope"""
+        key = interface.__name__
+        self._registrations[key] = {
+            'type': 'singleton',
+            'interface': interface,
+            'implementation': implementation or interface
+        }
+    
+    def register_transient(self, interface: Type[T], implementation: Type[T] = None):
+        """Register transient scope"""
+        key = interface.__name__
+        self._registrations[key] = {
+            'type': 'transient',
+            'interface': interface,
+            'implementation': implementation or interface
+        }
+    
+    def register_scoped(self, interface: Type[T], implementation: Type[T] = None):
+        """Register scoped scope"""
+        key = interface.__name__
+        self._registrations[key] = {
+            'type': 'scoped',
+            'interface': interface,
+            'implementation': implementation or interface
+        }
+    
+    def resolve(self, interface: Type[T]) -> T:
+        """Resolve dependency"""
+        key = interface.__name__
+        
+        if key not in self._registrations:
+            raise DependencyNotFoundError(f"Dependency {key} not registered")
+        
+        registration = self._registrations[key]
+        scope_type = registration['type']
+        
+        if scope_type == 'singleton':
+            return self._get_singleton_instance(key, registration)
+        elif scope_type == 'transient':
+            return self._create_transient_instance(registration)
+        elif scope_type == 'scoped':
+            return self._get_scoped_instance(key, registration)
+        else:
+            raise InvalidScopeError(f"Invalid scope type: {scope_type}")
+    
+    def _get_singleton_instance(self, key: str, registration: Dict[str, Any]) -> Any:
+        """Get or create singleton instance"""
+        with self._lock:
+            if key not in self._instances:
+                self._instances[key] = self._create_instance(registration)
+            return self._instances[key]
+    
+    def _create_transient_instance(self, registration: Dict[str, Any]) -> Any:
+        """Create new transient instance"""
+        return self._create_instance(registration)
+    
+    def _get_scoped_instance(self, key: str, registration: Dict[str, Any]) -> Any:
+        """Get or create scoped instance"""
+        # Implementation depends on scope context (request, session, etc.)
+        # For now, treat as transient
+        return self._create_instance(registration)
+    
+    def _create_instance(self, registration: Dict[str, Any]) -> Any:
+        """Create instance with dependency injection"""
+        implementation = registration['implementation']
+        
+        # Get constructor parameters
+        import inspect
+        sig = inspect.signature(implementation.__init__)
+        params = {}
+        
+        for param_name, param in sig.parameters.items():
+            if param_name == 'self':
+                continue
+            
+            # Resolve dependency
+            param_type = param.annotation
+            if param_type != inspect.Parameter.empty:
+                try:
+                    params[param_name] = self.resolve(param_type)
+                except DependencyNotFoundError:
+                    if param.default == inspect.Parameter.empty:
+                        raise DependencyInjectionError(
+                            f"Cannot resolve dependency {param_name} for {implementation.__name__}"
+                        )
+        
+        return implementation(**params)
+```
+
+#### 8.5.2 DI Exception Handling
+```python
+# di/exceptions/di_exceptions.py
+class DependencyInjectionError(Exception):
+    """Base DI exception"""
+    pass
+
+class DependencyNotFoundError(DependencyInjectionError):
+    """Dependency not found in container"""
+    pass
+
+class InvalidScopeError(DependencyInjectionError):
+    """Invalid scope type"""
+    pass
+
+class CircularDependencyError(DependencyInjectionError):
+    """Circular dependency detected"""
+    pass
+```
+
+#### 8.5.3 DI Decorators
+```python
+# di/decorators/injectable.py
+from typing import Type, Dict, Any
+import functools
+
+def injectable(cls: Type[T]) -> Type[T]:
+    """Mark class as injectable"""
+    cls._is_injectable = True
+    return cls
+
+def inject(dependency_type: Type[T], name: str = None):
+    """Inject dependency"""
+    def decorator(cls):
+        if not hasattr(cls, '_dependencies'):
+            cls._dependencies = {}
+        
+        key = name or dependency_type.__name__
+        cls._dependencies[key] = dependency_type
+        return cls
+    return decorator
+
+def singleton(cls: Type[T]) -> Type[T]:
+    """Mark class as singleton"""
+    cls._is_singleton = True
+    return cls
+```
+
+### 8.6 DI Usage Patterns
+
+#### 8.6.1 Service Registration Pattern
+```python
+# di/providers/service_provider.py
+class ServiceProvider:
+    def __init__(self, container: DIContainer):
+        self.container = container
+    
+    def register_all_services(self):
+        """Register all services in correct order"""
+        self._register_domain_services()
+        self._register_application_services()
+        self._register_infrastructure_services()
+        self._register_interface_services()
+    
+    def _register_domain_services(self):
+        """Register domain layer services"""
+        self.container.register_singleton(UserService)
+        self.container.register_singleton(OrderService)
+    
+    def _register_application_services(self):
+        """Register application layer services"""
+        self.container.register_transient(CreateUser)
+        self.container.register_transient(GetUser)
+        self.container.register_transient(CreateOrder)
+    
+    def _register_infrastructure_services(self):
+        """Register infrastructure layer services"""
+        self.container.register_scoped(UserSqlRepository, UserRepository)
+        self.container.register_scoped(OrderSqlRepository, OrderRepository)
+        self.container.register_singleton(HttpClient)
+        self.container.register_singleton(RedisCache)
+    
+    def _register_interface_services(self):
+        """Register interface layer services"""
+        self.container.register_transient(UserController)
+        self.container.register_transient(OrderController)
+```
+
+#### 8.6.2 Factory Pattern Integration
+```python
+# di/factories/service_factory.py
+class ServiceFactory:
+    def __init__(self, container: DIContainer):
+        self.container = container
+    
+    def create_user_service(self, config: Dict[str, Any]) -> UserService:
+        """Create UserService with configuration"""
+        user_repo = self.container.resolve(UserRepository)
+        return UserService(user_repo, config)
+    
+    def create_order_service(self, config: Dict[str, Any]) -> OrderService:
+        """Create OrderService with configuration"""
+        order_repo = self.container.resolve(OrderRepository)
+        return OrderService(order_repo, config)
+```
+
+### 8.7 DI Configuration Management
+
+#### 8.7.1 Environment-based DI Configuration
+```python
+# di/config/di_config.py
+import os
+from typing import Dict, Any
+
+class DIConfig:
+    def __init__(self):
+        self.environment = os.getenv('ENVIRONMENT', 'development')
+        self.config = self._load_config()
+    
+    def _load_config(self) -> Dict[str, Any]:
+        return {
+            'development': {
+                'database': 'sqlite',
+                'cache': 'memory',
+                'logging': 'console'
+            },
+            'production': {
+                'database': 'postgresql',
+                'cache': 'redis',
+                'logging': 'file'
+            }
+        }
+    
+    def get_database_type(self) -> str:
+        return self.config[self.environment]['database']
+    
+    def get_cache_type(self) -> str:
+        return self.config[self.environment]['cache']
+```
+
+#### 8.7.2 Feature Flag Integration
+```python
+# di/config/feature_flags.py
+class FeatureFlags:
+    def __init__(self):
+        self.flags = {
+            'use_redis_cache': True,
+            'use_async_processing': False,
+            'enable_caching': True
+        }
+    
+    def is_enabled(self, flag: str) -> bool:
+        return self.flags.get(flag, False)
+    
+    def get_cache_strategy(self) -> str:
+        if self.is_enabled('use_redis_cache'):
+            return 'redis'
+        return 'memory'
+```
+
+### 8.8 DI Testing Support
+
+#### 8.8.1 Test Container Setup
+```python
+# tests/fixtures/di_fixtures.py
+import pytest
+from di.container import DIContainer
+from di.providers.service_provider import ServiceProvider
+
+@pytest.fixture
+def test_container():
+    """Create test DI container"""
+    container = DIContainer()
+    provider = ServiceProvider(container)
+    provider.register_all_services()
+    return container
+
+@pytest.fixture
+def mock_container():
+    """Create mock DI container for testing"""
+    container = DIContainer()
+    # Register mocks instead of real implementations
+    return container
+```
+
+#### 8.8.2 DI Test Utilities
+```python
+# tests/utils/di_test_utils.py
+class DITestUtils:
+    @staticmethod
+    def create_test_container() -> DIContainer:
+        """Create container for testing"""
+        container = DIContainer()
+        # Register test implementations
+        return container
+    
+    @staticmethod
+    def mock_dependency(container: DIContainer, interface: Type[T], mock: Any):
+        """Mock dependency in container"""
+        container._registrations[interface.__name__] = {
+            'type': 'transient',
+            'interface': interface,
+            'implementation': lambda: mock
+        }
+```
+
+============================================================================
+## 9) TOOLING & CẤU HÌNH
+
+### 9.1 Core Tooling
 - `pyproject.toml`: ruff (lint+format), black (optional), mypy (strict), pytest, hypothesis.
 - `.pre-commit-config.yaml`: ruff, ruff‑format or black, mypy, import‑linter, bandit, pip‑audit.
 - `architecture.ini`: layered imports (domain; application; infrastructure; interfaces) + forbidden cross‑layer edges.
