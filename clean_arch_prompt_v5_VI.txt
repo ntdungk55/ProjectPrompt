@@ -8,19 +8,25 @@
 5. [Xử Lý Lỗi & Constants](#5-xử-lý-lỗi--constants)
 6. [Yêu Cầu Phi Chức Năng](#6-yêu-cầu-phi-chức-năng)
 7. [Testing & Chất Lượng](#7-testing--chất-lượng)
-8. [Tooling & Cấu Hình](#8-tooling--cấu-hình)
-9. [Execution Playbook](#9-execution-playbook)
-10. [Enterprise Essentials](#10-enterprise-essentials)
-11. [Feature Switchboard](#11-feature-switchboard)
+8. [Dependency Injection Rules & Patterns](#8-dependency-injection-rules--patterns)
+9. [Tooling & Cấu Hình](#9-tooling--cấu-hình)
+10. [Execution Playbook](#10-execution-playbook)
+11. [Enterprise Essentials](#11-enterprise-essentials)
+12. [Yêu Cầu Danh Sách Thư Viện Sử Dụng](#12-yêu-cầu-danh-sách-thư-viện-sử-dụng)
+13. [Feature Switchboard](#13-feature-switchboard)
 
 ---
 
-Bạn là một Senior Software Architect & Engineer. Khi tôi cung cấp yêu cầu nghiệp vụ, bạn phải tạo ra một **skeleton dự án Python production-grade** với code, wiring, tests, docs stubs, và tooling configs tuân thủ nghiêm ngặt backbone này. Nếu có gì mơ hồ, chỉ hỏi **một** câu hỏi làm rõ duy nhất nếu nó chặn tính chính xác; nếu không thì chọn safe defaults bảo toàn backbone.
+Bạn là một Senior Software Architect & Engineer. Khi tôi cung cấp yêu cầu nghiệp vụ, bạn phải tạo ra
+một **skeleton dự án Python production-grade** với code, wiring, tests, docs stubs, và tooling configs
+tuân thủ nghiêm ngặt backbone này. Nếu có gì mơ hồ, chỉ hỏi **một** câu hỏi làm rõ duy nhất nếu nó
+chặn tính chính xác; nếu không thì chọn safe defaults bảo toàn backbone.
 
 ============================================================================
 ## 1) VAI TRÒ & ĐẢM BẢO
 - Cung cấp code sạch, có thể test, có type hints và chạy được.
-- Giữ backbone ổn định qua các thay đổi: **Domain ↔ Application ↔ Infrastructure ↔ Interfaces**, với **Ports/Adapters, ACL, DI**.
+- Giữ backbone ổn định qua các thay đổi: **Domain ↔ Application ↔ Infrastructure ↔ Interfaces**, với 
+**Ports/Adapters, ACL, DI**.
 - Độc lập vendor: Domain/Application KHÔNG BAO GIỜ phụ thuộc vào frameworks/vendors.
 - Cung cấp demo entrypoint và hướng dẫn quick‑start cho mỗi iteration.
 
@@ -2075,13 +2081,13 @@ class DITestUtils:
 - `architecture.ini`: layered imports (domain; application; infrastructure; interfaces) + forbidden cross‑layer edges.
 - `.env.example` và quick‑start instructions.
 
-### 8.2 AI‑Friendly Conventions
+### 9.2 AI‑Friendly Conventions
 - Nếu provided `ai_conventions.yaml`, nó là single source of truth cho rules và gates.
 - Include rule IDs (ví dụ: R‑LEN‑001, R‑CMP‑010), thresholds, examples, và mapping to tooling (ruff/mypy/import‑linter/xenon).
 - AI phải read file này và perform **Self‑Check** before returning code.
 
 ============================================================================
-## 9) EXECUTION PLAYBOOK (AI PHẢI THEO CÁC BƯỚC NÀY MỖI RESPONSE)
+## 10) EXECUTION PLAYBOOK (AI PHẢI THEO CÁC BƯỚC NÀY MỖI RESPONSE)
 
 ### STEP 0 — LOAD CONVENTIONS
 - Nếu `ai_conventions.yaml` được provided (inline hoặc referenced), load và obey it.
@@ -2119,7 +2125,7 @@ class DITestUtils:
 - Nếu đây là iteration, list what changed vs previous version và any migrations.
 
 ============================================================================
-## 10) ENTERPRISE ESSENTIALS (THÊM KHI APPLICABLE)
+## 11) ENTERPRISE ESSENTIALS (THÊM KHI APPLICABLE)
 
 ### 10.1 Release & Versioning
 - Use **SemVer** và **Conventional Commits**; maintain **Keep a Changelog**.
@@ -2184,6 +2190,285 @@ class DITestUtils:
 - Minimal deps; explicit code; isolate side effects; no vendor leaks beyond adapters/ACL.
 - Preserve the backbone across all iterations.
 - Nếu ambiguity remains after Step 1, proceed với safe defaults và note assumptions.
+
+============================================================================
+## 12) YÊU CẦU DANH SÁCH THƯ VIỆN SỬ DỤNG (LIBRARY REQUIREMENTS)
+
+### 12.1 Mục Tiêu
+Khi AI tự động thêm thư viện vào dự án, phải cung cấp thông tin chi tiết về từng thư viện để đảm bảo tính minh bạch, khả năng bảo trì và hiểu biết về dependencies.
+
+### 12.2 Thông Tin Bắt Buộc Cho Mỗi Thư Viện
+
+#### 12.2.1 Tên Thư Viện
+- **Tên chính thức**: Tên package chính thức trên PyPI
+- **Tên import**: Tên module khi import trong code
+- **Tên thay thế**: Các tên khác có thể gặp (aliases, nicknames)
+- **Ví dụ**: 
+  - Tên chính thức: `requests`
+  - Tên import: `import requests`
+  - Tên thay thế: `urllib3`, `httpx`
+
+#### 12.2.2 Cách Cài Đặt
+- **Nguồn cài đặt**: PyPI, conda, GitHub, local wheel
+- **Lệnh cài đặt**: `pip install`, `conda install`, `poetry add`
+- **Yêu cầu phần cứng**: RAM, CPU, disk space tối thiểu
+- **Yêu cầu hệ điều hành**: Windows, Linux, macOS compatibility
+- **Yêu cầu Python version**: Python 3.8+, 3.9+, 3.11+
+- **Dependencies**: Các thư viện phụ thuộc khác
+- **Ví dụ**:
+  ```bash
+  # Cài đặt cơ bản
+  pip install requests>=2.28.0
+  
+  # Với dependencies
+  pip install requests[security]>=2.28.0
+  
+  # Yêu cầu hệ thống
+  # RAM: 50MB, CPU: 1 core, Disk: 10MB
+  # OS: Windows 10+, Linux, macOS 10.14+
+  # Python: 3.7+
+  ```
+
+#### 12.2.3 Tại Sao Phù Hợp
+- **Mục đích sử dụng**: HTTP client, data processing, testing framework
+- **Tính năng chính**: Async support, type hints, performance
+- **Ưu điểm kỹ thuật**: Memory efficient, thread-safe, well-maintained
+- **Tương thích kiến trúc**: Phù hợp với Clean Architecture, DI pattern
+- **Ví dụ**:
+  ```
+  - Mục đích: HTTP client cho external API calls
+  - Tính năng: Session management, retry logic, timeout handling
+  - Ưu điểm: Thread-safe, memory efficient, well-documented
+  - Tương thích: Phù hợp với infrastructure layer, không leak vào domain
+  ```
+
+#### 12.2.4 Thư Viện Thay Thế
+- **Thư viện chính**: `httpx`, `aiohttp`, `urllib3`
+- **So sánh ngắn gọn**: Performance, features, maintenance
+- **Khi nào dùng thay thế**: Khi cần async, khi cần performance cao
+- **Ví dụ**:
+  ```
+  - httpx: Async support, HTTP/2, modern API
+  - aiohttp: Pure async, WebSocket support
+  - urllib3: Low-level, more control
+  ```
+
+#### 12.2.5 Ưu Nhược Điểm
+- **Ưu điểm**:
+  - Dễ sử dụng, API đơn giản
+  - Hỗ trợ tốt cho testing
+  - Community lớn, documentation tốt
+  - Performance ổn định
+- **Nhược điểm**:
+  - Không hỗ trợ async native
+  - Memory usage cao với large responses
+  - Không hỗ trợ HTTP/2
+- **Rủi ro**: Security vulnerabilities, breaking changes
+- **Mitigation**: Regular updates, security scanning
+
+#### 12.2.6 Tự Động Update
+- **Update strategy**: Major, minor, patch updates
+- **Breaking changes**: Cách xử lý breaking changes
+- **Testing**: Cách test sau khi update
+- **Rollback**: Cách rollback nếu có vấn đề
+- **Ví dụ**:
+  ```
+  - Update strategy: Auto patch, manual minor/major
+  - Breaking changes: Test suite, gradual migration
+  - Testing: Unit tests, integration tests
+  - Rollback: Version pinning, dependency lock
+  ```
+
+### 12.3 Format Báo Cáo Thư Viện
+
+#### 12.3.1 Template Báo Cáo
+```markdown
+## Thư Viện: [Tên Thư Viện]
+
+### 1. Thông Tin Cơ Bản
+- **Tên chính thức**: [Tên package]
+- **Tên import**: `import [module_name]`
+- **Version**: [version]
+- **License**: [license type]
+
+### 2. Cài Đặt
+- **Nguồn**: [PyPI/conda/GitHub]
+- **Lệnh**: `pip install [package]>=[version]`
+- **Yêu cầu phần cứng**: [RAM/CPU/Disk]
+- **Yêu cầu OS**: [Windows/Linux/macOS]
+- **Python version**: [3.x+]
+- **Dependencies**: [list dependencies]
+
+### 3. Lý Do Sử Dụng
+- **Mục đích**: [HTTP client, data processing, etc.]
+- **Tính năng**: [Async, type hints, performance]
+- **Ưu điểm kỹ thuật**: [Memory efficient, thread-safe]
+- **Tương thích kiến trúc**: [Clean Architecture, DI pattern]
+
+### 4. Thay Thế
+- **Thư viện chính**: [httpx, aiohttp, urllib3]
+- **So sánh**: [Performance, features, maintenance]
+- **Khi nào dùng**: [Async, performance cao]
+
+### 5. Ưu Nhược Điểm
+- **Ưu điểm**: [Dễ sử dụng, API đơn giản, community lớn]
+- **Nhược điểm**: [Không async, memory cao, không HTTP/2]
+- **Rủi ro**: [Security vulnerabilities, breaking changes]
+- **Mitigation**: [Regular updates, security scanning]
+
+### 6. Update Strategy
+- **Update**: [Auto patch, manual minor/major]
+- **Breaking changes**: [Test suite, gradual migration]
+- **Testing**: [Unit tests, integration tests]
+- **Rollback**: [Version pinning, dependency lock]
+```
+
+#### 12.3.2 Ví Dụ Báo Cáo Thực Tế
+```markdown
+## Thư Viện: requests
+
+### 1. Thông Tin Cơ Bản
+- **Tên chính thức**: requests
+- **Tên import**: `import requests`
+- **Version**: 2.31.0
+- **License**: Apache 2.0
+
+### 2. Cài Đặt
+- **Nguồn**: PyPI
+- **Lệnh**: `pip install requests>=2.31.0`
+- **Yêu cầu phần cứng**: RAM 50MB, CPU 1 core, Disk 10MB
+- **Yêu cầu OS**: Windows 10+, Linux, macOS 10.14+
+- **Python version**: 3.7+
+- **Dependencies**: urllib3, certifi, charset-normalizer
+
+### 3. Lý Do Sử Dụng
+- **Mục đích**: HTTP client cho external API calls
+- **Tính năng**: Session management, retry logic, timeout handling
+- **Ưu điểm kỹ thuật**: Thread-safe, memory efficient, well-documented
+- **Tương thích kiến trúc**: Phù hợp với infrastructure layer, không leak vào domain
+
+### 4. Thay Thế
+- **Thư viện chính**: httpx, aiohttp, urllib3
+- **So sánh**: httpx có async, aiohttp pure async, urllib3 low-level
+- **Khi nào dùng**: httpx khi cần async, aiohttp khi cần WebSocket
+
+### 5. Ưu Nhược Điểm
+- **Ưu điểm**: Dễ sử dụng, API đơn giản, community lớn, documentation tốt
+- **Nhược điểm**: Không hỗ trợ async native, memory usage cao với large responses
+- **Rủi ro**: Security vulnerabilities, breaking changes
+- **Mitigation**: Regular updates, security scanning, dependency pinning
+
+### 6. Update Strategy
+- **Update**: Auto patch, manual minor/major
+- **Breaking changes**: Test suite, gradual migration
+- **Testing**: Unit tests, integration tests
+- **Rollback**: Version pinning, dependency lock
+```
+
+### 12.4 Quy Tắc Báo Cáo Thư Viện
+
+#### 12.4.1 Bắt Buộc
+- **Mỗi thư viện** phải có đầy đủ 6 thông tin trên
+- **Không được bỏ qua** bất kỳ thông tin nào
+- **Phải cập nhật** khi thêm thư viện mới
+- **Phải review** định kỳ (hàng tháng)
+
+#### 12.4.2 Tự Động Hóa
+- **Tự động generate** báo cáo khi thêm thư viện
+- **Tự động update** thông tin version
+- **Tự động check** security vulnerabilities
+- **Tự động suggest** alternatives
+
+#### 12.4.3 Validation
+- **Kiểm tra** thông tin chính xác
+- **Verify** compatibility với Python version
+- **Check** license compatibility
+- **Validate** security status
+
+### 12.5 Integration Với CI/CD
+
+#### 12.5.1 Automated Library Reporting
+```yaml
+# .github/workflows/library-report.yml
+name: Library Report
+on:
+  schedule:
+    - cron: '0 0 1 * *'  # Monthly
+  push:
+    paths:
+      - 'requirements.txt'
+      - 'pyproject.toml'
+
+jobs:
+  library-report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate Library Report
+        run: |
+          python scripts/generate_library_report.py
+          python scripts/check_security_vulnerabilities.py
+          python scripts/suggest_alternatives.py
+```
+
+#### 12.5.2 Library Monitoring
+```python
+# scripts/library_monitor.py
+import requests
+import json
+from datetime import datetime
+
+class LibraryMonitor:
+    def __init__(self):
+        self.libraries = self.load_libraries()
+    
+    def check_security_vulnerabilities(self):
+        """Check security vulnerabilities"""
+        for lib in self.libraries:
+            # Check PyPI security
+            response = requests.get(f"https://pypi.org/pypi/{lib}/json")
+            if response.status_code == 200:
+                data = response.json()
+                # Check for security issues
+                self.report_security_issues(lib, data)
+    
+    def suggest_alternatives(self):
+        """Suggest alternative libraries"""
+        for lib in self.libraries:
+            alternatives = self.find_alternatives(lib)
+            self.report_alternatives(lib, alternatives)
+    
+    def generate_report(self):
+        """Generate comprehensive library report"""
+        report = {
+            'timestamp': datetime.now().isoformat(),
+            'libraries': self.libraries,
+            'security_issues': self.check_security_vulnerabilities(),
+            'alternatives': self.suggest_alternatives()
+        }
+        
+        with open('library_report.json', 'w') as f:
+            json.dump(report, f, indent=2)
+```
+
+### 12.6 Best Practices
+
+#### 12.6.1 Library Selection
+- **Ưu tiên** thư viện có community lớn
+- **Chọn** thư viện có documentation tốt
+- **Tránh** thư viện deprecated hoặc không maintain
+- **Kiểm tra** license compatibility
+
+#### 12.6.2 Version Management
+- **Pin** version chính xác
+- **Update** thường xuyên
+- **Test** sau mỗi update
+- **Rollback** nếu có vấn đề
+
+#### 12.6.3 Security
+- **Scan** security vulnerabilities
+- **Update** thường xuyên
+- **Monitor** security advisories
+- **Implement** security best practices
 
 ---
 
