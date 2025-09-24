@@ -8,12 +8,13 @@
 5. [Xử Lý Lỗi & Constants](#5-xử-lý-lỗi--constants)
 6. [Yêu Cầu Phi Chức Năng](#6-yêu-cầu-phi-chức-năng)
 7. [Testing & Chất Lượng](#7-testing--chất-lượng)
-8. [Dependency Injection Rules & Patterns](#8-dependency-injection-rules--patterns)
-9. [Tooling & Cấu Hình](#9-tooling--cấu-hình)
-10. [Execution Playbook](#10-execution-playbook)
-11. [Enterprise Essentials](#11-enterprise-essentials)
-12. [Yêu Cầu Danh Sách Thư Viện Sử Dụng](#12-yêu-cầu-danh-sách-thư-viện-sử-dụng)
-13. [Feature Switchboard](#13-feature-switchboard)
+8. [Quy Tắc Bắt Buộc Tạo Test](#8-quy-tắc-bắt-buộc-tạo-test)
+9. [Dependency Injection Rules & Patterns](#9-dependency-injection-rules--patterns)
+10. [Tooling & Cấu Hình](#10-tooling--cấu-hình)
+11. [Execution Playbook](#11-execution-playbook)
+12. [Enterprise Essentials](#12-enterprise-essentials)
+13. [Yêu Cầu Danh Sách Thư Viện Sử Dụng](#13-yêu-cầu-danh-sách-thư-viện-sử-dụng)
+14. [Feature Switchboard](#14-feature-switchboard)
 
 ---
 
@@ -1656,26 +1657,67 @@ tests/security/
 - **Test documentation**: Test documentation updates
 
 ============================================================================
-## 8) DEPENDENCY INJECTION RULES & PATTERNS (QUY TẮC DI)
+## 8) QUY TẮC BẮT BUỘC TẠO TEST (MANDATORY TEST CREATION RULES)
 
-### 8.1 DI Architecture Principles
+### 8.1 Yêu Cầu Tạo Test (Test Creation Requirements)
 
-#### 8.1.1 Layered DI Container Structure
+#### 8.1.1 Quy Tắc: Mỗi File Phải Có Test Tương Ứng
+- **BẮT BUỘC**: Mỗi khi tạo file mới ở bất kỳ tầng nào, PHẢI tạo test file tương ứng
+- **KHÔNG ĐƯỢC BỎ QUA**: Không có ngoại lệ, mọi file đều phải có test
+- **TỰ ĐỘNG HÓA**: AI phải tự động tạo test khi tạo file mới
+- **VALIDATION**: Kiểm tra test coverage 100% cho mọi file mới
+
+#### 8.1.2 Quy Tắc Mapping Test File
+```
+# Domain Layer
+app/domain/entities/user.py → tests/domain/test_user.py
+app/domain/value_objects/email.py → tests/domain/test_email.py
+app/domain/services/user_service.py → tests/domain/test_user_service.py
+
+# Application Layer  
+app/application/use_cases/create_user.py → tests/application/test_create_user.py
+app/application/ports/user_repository.py → tests/application/test_user_repository.py
+app/application/dto/user_dto.py → tests/application/test_user_dto.py
+
+# Infrastructure Layer
+app/infrastructure/http/client.py → tests/infrastructure/test_client.py
+app/infrastructure/persistence/user_repository.py → tests/infrastructure/test_user_repository.py
+app/infrastructure/tomtom/adapters/route_adapter.py → tests/infrastructure/test_route_adapter.py
+
+# Interfaces Layer
+app/interfaces/mcp/user_tool.py → tests/interfaces/test_user_tool.py
+app/interfaces/rest/user_controller.py → tests/interfaces/test_user_controller.py
+app/interfaces/cli/user_cli.py → tests/interfaces/test_user_cli.py
+```
+
+#### 8.1.3 Yêu Cầu Nội Dung Test
+- **Test Class**: Một test class cho mỗi class trong file
+- **Test Methods**: Test tất cả public methods
+- **Test Scenarios**: Happy path, edge cases, error cases
+- **Test Data**: Fixtures và test data builders
+- **Test Coverage**: 100% line coverage cho file mới
+
+============================================================================
+## 9) DEPENDENCY INJECTION RULES & PATTERNS (QUY TẮC DI)
+
+### 9.1 DI Architecture Principles
+
+#### 9.1.1 Layered DI Container Structure
 - **Main Container**: `di/container.py` - Central DI registry
 - **Module Providers**: `di/providers/` - Layer-specific dependency registration
 - **Scope Management**: `di/scopes/` - Instance lifecycle management
 - **Factory Patterns**: `di/factories/` - Complex object creation
 - **Decorators**: `di/decorators/` - DI annotations và metadata
 
-#### 8.1.2 DI Scope Management
+#### 9.1.2 DI Scope Management
 - **Singleton**: 1 instance cho toàn bộ application lifecycle
 - **Transient**: New instance mỗi lần request
 - **Scoped**: 1 instance per request/operation scope
 - **Custom Scopes**: Business-specific scopes (per user, per session)
 
-### 8.2 DI Registration Rules
+### 9.2 DI Registration Rules
 
-#### 8.2.1 Domain Layer Registration
+#### 9.2.1 Domain Layer Registration
 ```python
 # di/providers/domain_provider.py
 class DomainProvider:
@@ -1689,7 +1731,7 @@ class DomainProvider:
         self.container.register_transient(Order)
 ```
 
-#### 8.2.2 Application Layer Registration
+#### 9.2.2 Application Layer Registration
 ```python
 # di/providers/application_provider.py
 class ApplicationProvider:
@@ -1703,7 +1745,7 @@ class ApplicationProvider:
         self.container.register_interface(OrderRepository)
 ```
 
-#### 8.2.3 Infrastructure Layer Registration
+#### 9.2.3 Infrastructure Layer Registration
 ```python
 # di/providers/infrastructure_provider.py
 class InfrastructureProvider:
@@ -1719,49 +1761,49 @@ class InfrastructureProvider:
         self.container.register_singleton(RedisCache)
 ```
 
-### 8.3 DI Instance Management Rules
+### 9.3 DI Instance Management Rules
 
-#### 8.3.1 Instance Lifecycle Management
+#### 9.3.1 Instance Lifecycle Management
 - **Singleton**: 1 instance cho toàn bộ app lifecycle
 - **Transient**: New instance mỗi lần resolve
 - **Scoped**: 1 instance per scope (request, session, user)
 - **Custom Scopes**: Business-specific scopes
 
-#### 8.3.2 Null Pointer Prevention
+#### 9.3.2 Null Pointer Prevention
 - **Always validate**: Check dependencies before use
 - **Type checking**: Validate dependency types
 - **Default values**: Provide sensible defaults
 - **Error handling**: Graceful degradation
 
-#### 8.3.3 Memory Management
+#### 9.3.3 Memory Management
 - **Weak references**: Use weakref for cleanup
 - **Garbage collection**: Regular cleanup of unused instances
 - **Memory monitoring**: Track instance counts
 - **Leak detection**: Detect memory leaks
 
-### 8.4 DI Best Practices
+### 9.4 DI Best Practices
 
-#### 8.4.1 Dependency Registration Order
+#### 9.4.1 Dependency Registration Order
 1. **Domain Layer**: Register domain services first
 2. **Application Layer**: Register use cases và ports
 3. **Infrastructure Layer**: Register implementations
 4. **Interfaces Layer**: Register controllers và handlers
 
-#### 8.4.2 Instance Cleanup Rules
+#### 9.4.2 Instance Cleanup Rules
 - **Singleton**: Clean up khi application shutdown
 - **Transient**: Automatic garbage collection
 - **Scoped**: Clean up khi scope ends
 - **Custom Scopes**: Clean up theo business rules
 
-#### 8.4.3 Performance Optimization
+#### 9.4.3 Performance Optimization
 - **Lazy loading**: Create instances only when needed
 - **Caching**: Cache frequently used instances
 - **Memory management**: Regular cleanup of unused instances
 - **Thread safety**: Thread-safe instance management
 
-### 8.5 DI Implementation Examples
+### 9.5 DI Implementation Examples
 
-#### 8.5.1 Main DI Container
+#### 9.5.1 Main DI Container
 ```python
 # di/container.py
 from typing import Dict, Any, Type, TypeVar, Optional, Callable
@@ -1866,7 +1908,7 @@ class DIContainer:
         return implementation(**params)
 ```
 
-#### 8.5.2 DI Exception Handling
+#### 9.5.2 DI Exception Handling
 ```python
 # di/exceptions/di_exceptions.py
 class DependencyInjectionError(Exception):
@@ -1886,7 +1928,7 @@ class CircularDependencyError(DependencyInjectionError):
     pass
 ```
 
-#### 8.5.3 DI Decorators
+#### 9.5.3 DI Decorators
 ```python
 # di/decorators/injectable.py
 from typing import Type, Dict, Any
@@ -1914,9 +1956,9 @@ def singleton(cls: Type[T]) -> Type[T]:
     return cls
 ```
 
-### 8.6 DI Usage Patterns
+### 9.6 DI Usage Patterns
 
-#### 8.6.1 Service Registration Pattern
+#### 9.6.1 Service Registration Pattern
 ```python
 # di/providers/service_provider.py
 class ServiceProvider:
@@ -1954,7 +1996,7 @@ class ServiceProvider:
         self.container.register_transient(OrderController)
 ```
 
-#### 8.6.2 Factory Pattern Integration
+#### 9.6.2 Factory Pattern Integration
 ```python
 # di/factories/service_factory.py
 class ServiceFactory:
@@ -1972,9 +2014,9 @@ class ServiceFactory:
         return OrderService(order_repo, config)
 ```
 
-### 8.7 DI Configuration Management
+### 9.7 DI Configuration Management
 
-#### 8.7.1 Environment-based DI Configuration
+#### 9.7.1 Environment-based DI Configuration
 ```python
 # di/config/di_config.py
 import os
@@ -2006,7 +2048,7 @@ class DIConfig:
         return self.config[self.environment]['cache']
 ```
 
-#### 8.7.2 Feature Flag Integration
+#### 9.7.2 Feature Flag Integration
 ```python
 # di/config/feature_flags.py
 class FeatureFlags:
@@ -2026,9 +2068,9 @@ class FeatureFlags:
         return 'memory'
 ```
 
-### 8.8 DI Testing Support
+### 9.8 DI Testing Support
 
-#### 8.8.1 Test Container Setup
+#### 9.8.1 Test Container Setup
 ```python
 # tests/fixtures/di_fixtures.py
 import pytest
@@ -2051,7 +2093,7 @@ def mock_container():
     return container
 ```
 
-#### 8.8.2 DI Test Utilities
+#### 9.8.2 DI Test Utilities
 ```python
 # tests/utils/di_test_utils.py
 class DITestUtils:
@@ -2073,21 +2115,21 @@ class DITestUtils:
 ```
 
 ============================================================================
-## 9) TOOLING & CẤU HÌNH
+## 10) TOOLING & CẤU HÌNH
 
-### 9.1 Core Tooling
+### 10.1 Core Tooling
 - `pyproject.toml`: ruff (lint+format), black (optional), mypy (strict), pytest, hypothesis.
 - `.pre-commit-config.yaml`: ruff, ruff‑format or black, mypy, import‑linter, bandit, pip‑audit.
 - `architecture.ini`: layered imports (domain; application; infrastructure; interfaces) + forbidden cross‑layer edges.
 - `.env.example` và quick‑start instructions.
 
-### 9.2 AI‑Friendly Conventions
+### 10.2 AI‑Friendly Conventions
 - Nếu provided `ai_conventions.yaml`, nó là single source of truth cho rules và gates.
 - Include rule IDs (ví dụ: R‑LEN‑001, R‑CMP‑010), thresholds, examples, và mapping to tooling (ruff/mypy/import‑linter/xenon).
 - AI phải read file này và perform **Self‑Check** before returning code.
 
 ============================================================================
-## 10) EXECUTION PLAYBOOK (AI PHẢI THEO CÁC BƯỚC NÀY MỖI RESPONSE)
+## 11) EXECUTION PLAYBOOK (AI PHẢI THEO CÁC BƯỚC NÀY MỖI RESPONSE)
 
 ### STEP 0 — LOAD CONVENTIONS
 - Nếu `ai_conventions.yaml` được provided (inline hoặc referenced), load và obey it.
@@ -2125,49 +2167,49 @@ class DITestUtils:
 - Nếu đây là iteration, list what changed vs previous version và any migrations.
 
 ============================================================================
-## 11) ENTERPRISE ESSENTIALS (THÊM KHI APPLICABLE)
+## 12) ENTERPRISE ESSENTIALS (THÊM KHI APPLICABLE)
 
-### 10.1 Release & Versioning
+### 12.1 Release & Versioning
 - Use **SemVer** và **Conventional Commits**; maintain **Keep a Changelog**.
 - CI sử dụng `python-semantic-release` (hoặc equivalent) để calculate versions, create tags, update changelog, và publish artifacts.
 - Release only từ `main`; require PRs; allow dry‑run mode before publishing.
 
-### 10.2 Dependencies Management
+### 12.2 Dependencies Management
 - Choose one source‑of‑truth: **uv** | **Poetry** | **pip‑tools**.
 - Lockfile required cho apps (commit); libs may omit lockfile. Reproducible builds trong CI.
 
-### 10.3 Packaging & Layout
+### 12.3 Packaging & Layout
 - Comply với official Python Packaging User Guide.
 - Use `pyproject.toml` metadata (name, version, requires‑python, classifiers).
 - Prefer `src/` layout khi building packages.
 
-### 10.4 Security & Supply‑Chain
+### 12.4 Security & Supply‑Chain
 - CI runs **pip‑audit** (deps) và **Bandit** (code). Generate **SBOM CycloneDX** cho releases.
 - Provide provenance/attestations (SLSA) via CI nếu required.
 - Enable secret scanning và prevent secrets from being committed.
 
-### 10.5 Configuration & Secrets
+### 12.5 Configuration & Secrets
 - Strict **12‑Factor** configuration; secrets only via env/secret store.
 - Never log secrets; PII redaction policies.
 
-### 10.6 Observability
+### 12.6 Observability
 - Optional **OpenTelemetry** integration (traces/metrics/logs) với correlation IDs.
 - Emit timing/retry/circuit‑breaker metrics cho external calls.
 
-### 10.7 Containers & Dev Environments
+### 12.7 Containers & Dev Environments
 - Provide **Docker** multi‑stage builds (small runtime images).
 - Optionally include **Dev Container** config (VS Code) cho consistent local envs.
 
-### 10.8 Documentation
+### 12.8 Documentation
 - Use **MkDocs Material** + **mkdocstrings** để render docs từ docstrings.
 - Publish docs via CI (ví dụ: GitHub Pages).
 
-### 10.9 Repository Health
+### 12.9 Repository Health
 - Include: **LICENSE**, **CODE_OF_CONDUCT**, **CONTRIBUTING**, **SECURITY.md**,
   issue/PR templates, CODEOWNERS (optional). For orgs, allow `.github` defaults.
 
 ============================================================================
-## 11) FEATURE SWITCHBOARD (OPTIONAL TOGGLES TÔI CÓ THỂ REQUEST)
+## 13) FEATURE SWITCHBOARD (OPTIONAL TOGGLES TÔI CÓ THỂ REQUEST)
 - delivery: mcp | rest | cli | any combination
 - db: sqlite | postgres | mongo | none
 - queue: none | redis | rabbitmq | kafka
@@ -2177,7 +2219,7 @@ class DITestUtils:
 - tests: include_contract=on/off, include_property=on/off, include_mutation=on/off
 
 ============================================================================
-## 12) OUTPUT FORMAT (MỖI LẦN)
+## 14) OUTPUT FORMAT (MỖI LẦN)
 - (A) Brief plan
 - (B) File tree với paths
 - (C) Code stubs (concise, runnable)
@@ -2186,20 +2228,20 @@ class DITestUtils:
 - (F) (Optional) Zip artifact nếu tôi ask
 
 ============================================================================
-## 13) GROUND RULES
+## 15) GROUND RULES
 - Minimal deps; explicit code; isolate side effects; no vendor leaks beyond adapters/ACL.
 - Preserve the backbone across all iterations.
 - Nếu ambiguity remains after Step 1, proceed với safe defaults và note assumptions.
 
 ============================================================================
-## 12) YÊU CẦU DANH SÁCH THƯ VIỆN SỬ DỤNG (LIBRARY REQUIREMENTS)
+## 13) YÊU CẦU DANH SÁCH THƯ VIỆN SỬ DỤNG (LIBRARY REQUIREMENTS)
 
-### 12.1 Mục Tiêu
+### 13.1 Mục Tiêu
 Khi AI tự động thêm thư viện vào dự án, phải cung cấp thông tin chi tiết về từng thư viện để đảm bảo tính minh bạch, khả năng bảo trì và hiểu biết về dependencies.
 
-### 12.2 Thông Tin Bắt Buộc Cho Mỗi Thư Viện
+### 13.2 Thông Tin Bắt Buộc Cho Mỗi Thư Viện
 
-#### 12.2.1 Tên Thư Viện
+#### 13.2.1 Tên Thư Viện
 - **Tên chính thức**: Tên package chính thức trên PyPI
 - **Tên import**: Tên module khi import trong code
 - **Tên thay thế**: Các tên khác có thể gặp (aliases, nicknames)
@@ -2208,7 +2250,7 @@ Khi AI tự động thêm thư viện vào dự án, phải cung cấp thông ti
   - Tên import: `import requests`
   - Tên thay thế: `urllib3`, `httpx`
 
-#### 12.2.2 Cách Cài Đặt
+#### 13.2.2 Cách Cài Đặt
 - **Nguồn cài đặt**: PyPI, conda, GitHub, local wheel
 - **Lệnh cài đặt**: `pip install`, `conda install`, `poetry add`
 - **Yêu cầu phần cứng**: RAM, CPU, disk space tối thiểu
@@ -2229,7 +2271,7 @@ Khi AI tự động thêm thư viện vào dự án, phải cung cấp thông ti
   # Python: 3.7+
   ```
 
-#### 12.2.3 Tại Sao Phù Hợp
+#### 13.2.3 Tại Sao Phù Hợp
 - **Mục đích sử dụng**: HTTP client, data processing, testing framework
 - **Tính năng chính**: Async support, type hints, performance
 - **Ưu điểm kỹ thuật**: Memory efficient, thread-safe, well-maintained
