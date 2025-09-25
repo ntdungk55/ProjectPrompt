@@ -285,6 +285,728 @@ docs/
 - Import **tại boundary tương ứng**; không cross-layer import ngược (tuân thủ layered imports).
 - Với giá trị có rủi ro thay đổi theo môi trường, **không** dùng constants trực tiếp: đọc từ **settings** (ENV), sau đó fallback về constants.
 
+### 5.3 String Constants & Messages Rules
+
+#### Mục Tiêu
+- Chuẩn hoá nơi đặt **string constants**, **error messages**, **validation messages**, **API responses**, **logging messages**.
+- Đảm bảo **single source of truth** cho tất cả string values, tránh hardcode.
+- Hỗ trợ **i18n** (internationalization) và **localization**.
+
+#### Phạm Vi & Ràng Buộc
+- **Domain/constants/**: chỉ **business terminology** và **domain-specific strings** (ví dụ: `DEFAULT_CURRENCY_SYMBOL`, `ORDER_STATUS_LABELS`).
+- **Application/constants/**: **use case messages**, **validation rules**, **business logic strings** (ví dụ: `VALIDATION_MESSAGES`, `BUSINESS_RULES`).
+- **Infrastructure/constants/**: **technical messages**, **system errors**, **logging formats** (ví dụ: `LOG_FORMATS`, `SYSTEM_MESSAGES`).
+- **Interfaces/constants/**: **UI messages**, **API responses**, **user-facing strings** (ví dụ: `UI_MESSAGES`, `API_RESPONSES`).
+
+#### String Constants Categories
+
+##### 5.3.1 Error Messages
+```python
+# app/application/constants/error_messages.py
+class ErrorMessages:
+    # Validation errors
+    INVALID_EMAIL = "Email không hợp lệ"
+    REQUIRED_FIELD = "Trường này là bắt buộc"
+    INVALID_LENGTH = "Độ dài không hợp lệ"
+    
+    # Business logic errors
+    USER_NOT_FOUND = "Không tìm thấy người dùng"
+    INSUFFICIENT_BALANCE = "Số dư không đủ"
+    DUPLICATE_ENTRY = "Bản ghi đã tồn tại"
+```
+
+##### 5.3.2 Validation Messages
+```python
+# app/application/constants/validation_messages.py
+class ValidationMessages:
+    EMAIL_FORMAT = "Email phải có định dạng hợp lệ"
+    PASSWORD_STRENGTH = "Mật khẩu phải có ít nhất 8 ký tự"
+    PHONE_FORMAT = "Số điện thoại phải có 10-11 chữ số"
+    REQUIRED_FIELD = "Trường {field_name} là bắt buộc"
+```
+
+##### 5.3.3 API Response Messages
+```python
+# app/interfaces/constants/api_messages.py
+class ApiMessages:
+    SUCCESS_CREATED = "Tạo thành công"
+    SUCCESS_UPDATED = "Cập nhật thành công"
+    SUCCESS_DELETED = "Xóa thành công"
+    NOT_FOUND = "Không tìm thấy tài nguyên"
+    UNAUTHORIZED = "Không có quyền truy cập"
+    FORBIDDEN = "Bị cấm truy cập"
+```
+
+##### 5.3.4 Logging Messages
+```python
+# app/infrastructure/constants/logging_messages.py
+class LoggingMessages:
+    REQUEST_STARTED = "Request started: {method} {path}"
+    REQUEST_COMPLETED = "Request completed: {status_code} in {duration}ms"
+    DATABASE_CONNECTED = "Database connected successfully"
+    CACHE_HIT = "Cache hit for key: {key}"
+    CACHE_MISS = "Cache miss for key: {key}"
+```
+
+##### 5.3.5 UI Messages
+```python
+# app/interfaces/constants/ui_messages.py
+class UiMessages:
+    LOADING = "Đang tải..."
+    SAVING = "Đang lưu..."
+    SUCCESS = "Thành công"
+    ERROR = "Có lỗi xảy ra"
+    CONFIRM_DELETE = "Bạn có chắc chắn muốn xóa?"
+    NO_DATA = "Không có dữ liệu"
+```
+
+#### String Constants Naming Convention
+- **Class names**: `ErrorMessages`, `ValidationMessages`, `ApiMessages`, `LoggingMessages`, `UiMessages`
+- **Constant names**: `UPPER_SNAKE_CASE` với mô tả rõ ràng
+- **File names**: `error_messages.py`, `validation_messages.py`, `api_messages.py`
+- **Template strings**: Sử dụng `{variable}` cho dynamic values
+
+#### String Constants Usage Rules
+1. **KHÔNG hardcode strings** trong code logic
+2. **Import constants** từ appropriate layer
+3. **Sử dụng template strings** cho dynamic values
+4. **Group related strings** trong cùng một class
+5. **Document string purpose** trong docstring
+
+#### I18n Support
+```python
+# app/interfaces/constants/i18n_messages.py
+class I18nMessages:
+    def __init__(self, locale: str = "vi"):
+        self.locale = locale
+        self.messages = self._load_messages()
+    
+    def _load_messages(self):
+        return {
+            "vi": {
+                "user_not_found": "Không tìm thấy người dùng",
+                "invalid_email": "Email không hợp lệ"
+            },
+            "en": {
+                "user_not_found": "User not found",
+                "invalid_email": "Invalid email format"
+            }
+        }
+    
+    def get_message(self, key: str) -> str:
+        return self.messages.get(self.locale, {}).get(key, key)
+```
+
+#### String Constants Best Practices
+- **Single source of truth**: Mỗi string chỉ định nghĩa một lần
+- **Consistent naming**: Sử dụng naming convention nhất quán
+- **Documentation**: Mô tả rõ ràng mục đích của mỗi string
+- **Versioning**: Hỗ trợ versioning cho string constants
+- **Testing**: Test string constants để đảm bảo tính chính xác
+
+### 5.4 Data Constants & Configuration Rules (Tất Cả Loại Data)
+
+#### Mục Tiêu
+- Chuẩn hoá nơi đặt **tất cả loại data constants**: numbers, booleans, lists, dictionaries, enums, configurations.
+- Đảm bảo **single source of truth** cho mọi loại data, tránh hardcode.
+- Hỗ trợ **type safety** và **validation** cho tất cả constants.
+
+#### Phạm Vi & Ràng Buộc Theo Layer
+- **Domain/constants/**: **business rules**, **domain values**, **business enums** (ví dụ: `ORDER_STATUSES`, `CURRENCY_CODES`, `BUSINESS_RULES`).
+- **Application/constants/**: **use case configurations**, **validation rules**, **application settings** (ví dụ: `VALIDATION_RULES`, `PAGINATION_DEFAULTS`, `RETRY_POLICIES`).
+- **Infrastructure/constants/**: **technical configurations**, **system settings**, **external service configs** (ví dụ: `DATABASE_CONFIGS`, `CACHE_SETTINGS`, `HTTP_TIMEOUTS`).
+- **Interfaces/constants/**: **UI configurations**, **API settings**, **user interface defaults** (ví dụ: `UI_DEFAULTS`, `API_VERSIONS`, `DISPLAY_FORMATS`).
+
+#### Data Constants Categories
+
+##### 5.4.1 Numeric Constants
+```python
+# app/domain/constants/business_values.py
+class BusinessValues:
+    # Business rules
+    MAX_ORDER_ITEMS = 50
+    MIN_ORDER_AMOUNT = 1000
+    MAX_DISCOUNT_PERCENTAGE = 30
+    DEFAULT_TAX_RATE = 0.1
+    
+    # Domain limits
+    MAX_USER_NAME_LENGTH = 100
+    MIN_PASSWORD_LENGTH = 8
+    MAX_FILE_SIZE_MB = 10
+
+# app/application/constants/validation_rules.py
+class ValidationRules:
+    # Validation limits
+    EMAIL_MAX_LENGTH = 254
+    PHONE_MIN_LENGTH = 10
+    PHONE_MAX_LENGTH = 15
+    PASSWORD_MIN_LENGTH = 8
+    PASSWORD_MAX_LENGTH = 128
+```
+
+##### 5.4.2 Boolean Constants
+```python
+# app/domain/constants/feature_flags.py
+class FeatureFlags:
+    ENABLE_EMAIL_VERIFICATION = True
+    ENABLE_SMS_NOTIFICATIONS = False
+    ENABLE_TWO_FACTOR_AUTH = True
+    ENABLE_ANALYTICS = True
+    ENABLE_DEBUG_MODE = False
+
+# app/application/constants/business_rules.py
+class BusinessRules:
+    ALLOW_GUEST_CHECKOUT = True
+    REQUIRE_EMAIL_VERIFICATION = True
+    ALLOW_MULTIPLE_ADDRESSES = True
+    ENABLE_WISHLIST = True
+```
+
+##### 5.4.3 List Constants
+```python
+# app/domain/constants/enums.py
+class OrderStatuses:
+    PENDING = "pending"
+    CONFIRMED = "confirmed"
+    SHIPPED = "shipped"
+    DELIVERED = "delivered"
+    CANCELLED = "cancelled"
+    
+    ALL_STATUSES = [PENDING, CONFIRMED, SHIPPED, DELIVERED, CANCELLED]
+    ACTIVE_STATUSES = [PENDING, CONFIRMED, SHIPPED]
+    FINAL_STATUSES = [DELIVERED, CANCELLED]
+
+# app/application/constants/validation_patterns.py
+class ValidationPatterns:
+    EMAIL_PATTERN = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    PHONE_PATTERN = r'^(\+84|84|0)[0-9]{9,10}$'
+    PASSWORD_PATTERN = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d@$!%*?&]{8,}$'
+    
+    SUPPORTED_CURRENCIES = ['VND', 'USD', 'EUR']
+    SUPPORTED_LANGUAGES = ['vi', 'en', 'ja', 'ko']
+```
+
+##### 5.4.4 Dictionary Constants
+```python
+# app/domain/constants/business_configs.py
+class BusinessConfigs:
+    ORDER_STATUS_TRANSITIONS = {
+        'pending': ['confirmed', 'cancelled'],
+        'confirmed': ['shipped', 'cancelled'],
+        'shipped': ['delivered'],
+        'delivered': [],
+        'cancelled': []
+    }
+    
+    PAYMENT_METHODS = {
+        'cash': {'name': 'Tiền mặt', 'fee': 0},
+        'card': {'name': 'Thẻ', 'fee': 0.03},
+        'bank_transfer': {'name': 'Chuyển khoản', 'fee': 0.01}
+    }
+
+# app/application/constants/error_codes.py
+class ErrorCodes:
+    VALIDATION_ERRORS = {
+        'INVALID_EMAIL': {'code': 'VAL-001', 'message': 'Email không hợp lệ'},
+        'REQUIRED_FIELD': {'code': 'VAL-002', 'message': 'Trường bắt buộc'},
+        'INVALID_LENGTH': {'code': 'VAL-003', 'message': 'Độ dài không hợp lệ'}
+    }
+    
+    BUSINESS_ERRORS = {
+        'USER_NOT_FOUND': {'code': 'BUS-001', 'message': 'Không tìm thấy người dùng'},
+        'INSUFFICIENT_BALANCE': {'code': 'BUS-002', 'message': 'Số dư không đủ'}
+    }
+```
+
+##### 5.4.5 Configuration Constants
+```python
+# app/infrastructure/constants/database_configs.py
+class DatabaseConfigs:
+    DEFAULT_POOL_SIZE = 10
+    MAX_POOL_SIZE = 20
+    CONNECTION_TIMEOUT = 30
+    QUERY_TIMEOUT = 60
+    
+    SUPPORTED_DATABASES = ['postgresql', 'mysql', 'sqlite']
+    DEFAULT_DATABASE = 'postgresql'
+
+# app/infrastructure/constants/cache_configs.py
+class CacheConfigs:
+    DEFAULT_TTL = 3600  # 1 hour
+    MAX_TTL = 86400     # 24 hours
+    CACHE_PREFIX = 'app:'
+    
+    CACHE_KEYS = {
+        'user': 'user:{user_id}',
+        'session': 'session:{session_id}',
+        'product': 'product:{product_id}'
+    }
+```
+
+##### 5.4.6 API Constants
+```python
+# app/interfaces/constants/api_configs.py
+class ApiConfigs:
+    DEFAULT_PAGE_SIZE = 20
+    MAX_PAGE_SIZE = 100
+    DEFAULT_TIMEOUT = 30
+    
+    SUPPORTED_VERSIONS = ['v1', 'v2']
+    CURRENT_VERSION = 'v1'
+    
+    RATE_LIMITS = {
+        'default': {'requests': 100, 'window': 3600},
+        'premium': {'requests': 1000, 'window': 3600}
+    }
+```
+
+#### Data Constants Naming Convention
+- **Class names**: `BusinessValues`, `ValidationRules`, `FeatureFlags`, `ErrorCodes`
+- **Constant names**: `UPPER_SNAKE_CASE` với mô tả rõ ràng
+- **File names**: `business_values.py`, `validation_rules.py`, `feature_flags.py`
+- **Group related constants** trong cùng một class
+
+#### Data Constants Usage Rules
+1. **KHÔNG hardcode values** trong code logic
+2. **Import constants** từ appropriate layer
+3. **Sử dụng type hints** cho tất cả constants
+4. **Group related constants** trong cùng một class
+5. **Document constant purpose** trong docstring
+6. **Validate constant values** trong tests
+
+#### Type Safety & Validation
+```python
+# app/domain/constants/typed_constants.py
+from typing import Dict, List, Union, Literal
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class TypedConstants:
+    # Numeric constants with type hints
+    MAX_ORDER_ITEMS: int = 50
+    MIN_ORDER_AMOUNT: float = 1000.0
+    DEFAULT_TAX_RATE: float = 0.1
+    
+    # List constants with type hints
+    SUPPORTED_CURRENCIES: List[str] = None
+    
+    def __post_init__(self):
+        if self.SUPPORTED_CURRENCIES is None:
+            object.__setattr__(self, 'SUPPORTED_CURRENCIES', ['VND', 'USD', 'EUR'])
+
+# Usage with type checking
+def validate_order_items(count: int) -> bool:
+    return count <= TypedConstants.MAX_ORDER_ITEMS
+```
+
+#### Environment-based Constants
+```python
+# app/infrastructure/constants/env_constants.py
+import os
+from typing import Any
+
+class EnvConstants:
+    def __init__(self):
+        self.environment = os.getenv('ENVIRONMENT', 'development')
+        self.config = self._load_config()
+    
+    def _load_config(self) -> Dict[str, Any]:
+        return {
+            'development': {
+                'debug': True,
+                'log_level': 'DEBUG',
+                'database_url': 'sqlite:///dev.db'
+            },
+            'production': {
+                'debug': False,
+                'log_level': 'INFO',
+                'database_url': os.getenv('DATABASE_URL')
+            }
+        }
+    
+    def get_constant(self, key: str, default: Any = None) -> Any:
+        return self.config.get(self.environment, {}).get(key, default)
+```
+
+#### Data Constants Best Practices
+- **Single source of truth**: Mỗi constant chỉ định nghĩa một lần
+- **Type safety**: Sử dụng type hints cho tất cả constants
+- **Validation**: Validate constant values trong tests
+- **Documentation**: Mô tả rõ ràng mục đích của mỗi constant
+- **Versioning**: Hỗ trợ versioning cho constants
+- **Testing**: Test constants để đảm bảo tính chính xác
+- **Environment awareness**: Hỗ trợ different values cho different environments
+
+### 5.5 Global Constants Architecture (Kiến Trúc Constants Toàn Cục)
+
+#### Mục Tiêu
+- Tạo **Global Constant Class** chứa tất cả constants dùng chung across layers
+- Tách biệt **string constants** không phải input/output vào constant layer
+- Đảm bảo **single source of truth** cho toàn bộ application
+- Hỗ trợ **centralized configuration management**
+
+#### Global Constants Structure
+```
+app/
+  constants/                    # Global constants layer
+    __init__.py
+    global_constants.py         # Main global constants class
+    business_constants.py      # Business-specific constants
+    technical_constants.py     # Technical constants
+    ui_constants.py           # UI-specific constants
+    validation_constants.py   # Validation constants
+    error_constants.py       # Error constants
+    config_constants.py      # Configuration constants
+```
+
+#### 5.5.1 Global Constants Class
+```python
+# app/constants/global_constants.py
+from typing import Dict, List, Any, Union
+from dataclasses import dataclass
+from enum import Enum
+
+@dataclass(frozen=True)
+class GlobalConstants:
+    """Global constants class - Single source of truth for all constants"""
+    
+    # ===== BUSINESS CONSTANTS =====
+    # Order & Payment
+    MAX_ORDER_ITEMS: int = 50
+    MIN_ORDER_AMOUNT: float = 1000.0
+    MAX_DISCOUNT_PERCENTAGE: int = 30
+    DEFAULT_TAX_RATE: float = 0.1
+    
+    # User & Authentication
+    MAX_USER_NAME_LENGTH: int = 100
+    MIN_PASSWORD_LENGTH: int = 8
+    MAX_PASSWORD_LENGTH: int = 128
+    SESSION_TIMEOUT_MINUTES: int = 30
+    
+    # File & Upload
+    MAX_FILE_SIZE_MB: int = 10
+    ALLOWED_FILE_TYPES: List[str] = None
+    
+    # ===== TECHNICAL CONSTANTS =====
+    # Database
+    DEFAULT_POOL_SIZE: int = 10
+    MAX_POOL_SIZE: int = 20
+    CONNECTION_TIMEOUT: int = 30
+    QUERY_TIMEOUT: int = 60
+    
+    # Cache
+    DEFAULT_TTL: int = 3600
+    MAX_TTL: int = 86400
+    CACHE_PREFIX: str = 'app:'
+    
+    # HTTP
+    DEFAULT_TIMEOUT: int = 30
+    MAX_RETRIES: int = 3
+    RETRY_DELAY: int = 1
+    
+    # ===== API CONSTANTS =====
+    DEFAULT_PAGE_SIZE: int = 20
+    MAX_PAGE_SIZE: int = 100
+    SUPPORTED_VERSIONS: List[str] = None
+    CURRENT_VERSION: str = 'v1'
+    
+    # ===== VALIDATION CONSTANTS =====
+    EMAIL_MAX_LENGTH: int = 254
+    PHONE_MIN_LENGTH: int = 10
+    PHONE_MAX_LENGTH: int = 15
+    
+    # ===== FEATURE FLAGS =====
+    ENABLE_EMAIL_VERIFICATION: bool = True
+    ENABLE_SMS_NOTIFICATIONS: bool = False
+    ENABLE_TWO_FACTOR_AUTH: bool = True
+    ENABLE_ANALYTICS: bool = True
+    ENABLE_DEBUG_MODE: bool = False
+    
+    def __post_init__(self):
+        # Initialize mutable defaults
+        if self.ALLOWED_FILE_TYPES is None:
+            object.__setattr__(self, 'ALLOWED_FILE_TYPES', ['jpg', 'png', 'pdf', 'doc'])
+        if self.SUPPORTED_VERSIONS is None:
+            object.__setattr__(self, 'SUPPORTED_VERSIONS', ['v1', 'v2'])
+
+# Global instance
+GLOBAL_CONSTANTS = GlobalConstants()
+```
+
+#### 5.5.2 Business Constants
+```python
+# app/constants/business_constants.py
+from typing import Dict, List
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class BusinessConstants:
+    """Business-specific constants"""
+    
+    # Order Statuses
+    ORDER_STATUSES = {
+        'PENDING': 'pending',
+        'CONFIRMED': 'confirmed', 
+        'SHIPPED': 'shipped',
+        'DELIVERED': 'delivered',
+        'CANCELLED': 'cancelled'
+    }
+    
+    ALL_ORDER_STATUSES = list(ORDER_STATUSES.values())
+    ACTIVE_ORDER_STATUSES = ['pending', 'confirmed', 'shipped']
+    FINAL_ORDER_STATUSES = ['delivered', 'cancelled']
+    
+    # Payment Methods
+    PAYMENT_METHODS = {
+        'cash': {'name': 'Tiền mặt', 'fee': 0, 'enabled': True},
+        'card': {'name': 'Thẻ', 'fee': 0.03, 'enabled': True},
+        'bank_transfer': {'name': 'Chuyển khoản', 'fee': 0.01, 'enabled': True}
+    }
+    
+    # Currency
+    SUPPORTED_CURRENCIES = ['VND', 'USD', 'EUR']
+    DEFAULT_CURRENCY = 'VND'
+    
+    # Business Rules
+    ORDER_STATUS_TRANSITIONS = {
+        'pending': ['confirmed', 'cancelled'],
+        'confirmed': ['shipped', 'cancelled'],
+        'shipped': ['delivered'],
+        'delivered': [],
+        'cancelled': []
+    }
+```
+
+#### 5.5.3 Technical Constants
+```python
+# app/constants/technical_constants.py
+from typing import Dict, List
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class TechnicalConstants:
+    """Technical constants for system configuration"""
+    
+    # Database
+    SUPPORTED_DATABASES = ['postgresql', 'mysql', 'sqlite']
+    DEFAULT_DATABASE = 'postgresql'
+    
+    # Cache Keys
+    CACHE_KEYS = {
+        'user': 'user:{user_id}',
+        'session': 'session:{session_id}',
+        'product': 'product:{product_id}',
+        'order': 'order:{order_id}'
+    }
+    
+    # Logging
+    LOG_LEVELS = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
+    DEFAULT_LOG_LEVEL = 'INFO'
+    
+    # Rate Limiting
+    RATE_LIMITS = {
+        'default': {'requests': 100, 'window': 3600},
+        'premium': {'requests': 1000, 'window': 3600},
+        'admin': {'requests': 10000, 'window': 3600}
+    }
+```
+
+#### 5.5.4 UI Constants
+```python
+# app/constants/ui_constants.py
+from typing import Dict, List
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class UiConstants:
+    """UI-specific constants"""
+    
+    # Display Formats
+    DATE_FORMAT = '%d/%m/%Y'
+    DATETIME_FORMAT = '%d/%m/%Y %H:%M:%S'
+    CURRENCY_FORMAT = '{:,.0f} VND'
+    
+    # Pagination
+    DEFAULT_PAGE_SIZE = 20
+    MAX_PAGE_SIZE = 100
+    PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
+    
+    # UI Messages (Non-I/O strings)
+    LOADING_MESSAGES = {
+        'default': 'Đang tải...',
+        'saving': 'Đang lưu...',
+        'deleting': 'Đang xóa...',
+        'processing': 'Đang xử lý...'
+    }
+    
+    SUCCESS_MESSAGES = {
+        'created': 'Tạo thành công',
+        'updated': 'Cập nhật thành công',
+        'deleted': 'Xóa thành công',
+        'saved': 'Lưu thành công'
+    }
+    
+    ERROR_MESSAGES = {
+        'general': 'Có lỗi xảy ra',
+        'network': 'Lỗi kết nối mạng',
+        'timeout': 'Hết thời gian chờ',
+        'unauthorized': 'Không có quyền truy cập'
+    }
+```
+
+#### 5.5.5 Validation Constants
+```python
+# app/constants/validation_constants.py
+from typing import Dict, List
+from dataclasses import dataclass
+import re
+
+@dataclass(frozen=True)
+class ValidationConstants:
+    """Validation constants and patterns"""
+    
+    # Regex Patterns
+    EMAIL_PATTERN = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+    PHONE_PATTERN = re.compile(r'^(\+84|84|0)[0-9]{9,10}$')
+    PASSWORD_PATTERN = re.compile(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d@$!%*?&]{8,}$')
+    
+    # Validation Rules
+    VALIDATION_RULES = {
+        'email': {
+            'max_length': 254,
+            'pattern': EMAIL_PATTERN,
+            'required': True
+        },
+        'phone': {
+            'min_length': 10,
+            'max_length': 15,
+            'pattern': PHONE_PATTERN,
+            'required': True
+        },
+        'password': {
+            'min_length': 8,
+            'max_length': 128,
+            'pattern': PASSWORD_PATTERN,
+            'required': True
+        }
+    }
+    
+    # Supported Languages
+    SUPPORTED_LANGUAGES = ['vi', 'en', 'ja', 'ko']
+    DEFAULT_LANGUAGE = 'vi'
+```
+
+#### 5.5.6 Error Constants
+```python
+# app/constants/error_constants.py
+from typing import Dict, List
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class ErrorConstants:
+    """Error constants and codes"""
+    
+    # Error Codes
+    ERROR_CODES = {
+        'VALIDATION': {
+            'INVALID_EMAIL': 'VAL-001',
+            'REQUIRED_FIELD': 'VAL-002',
+            'INVALID_LENGTH': 'VAL-003',
+            'INVALID_FORMAT': 'VAL-004'
+        },
+        'BUSINESS': {
+            'USER_NOT_FOUND': 'BUS-001',
+            'INSUFFICIENT_BALANCE': 'BUS-002',
+            'DUPLICATE_ENTRY': 'BUS-003',
+            'INVALID_STATE': 'BUS-004'
+        },
+        'TECHNICAL': {
+            'DATABASE_ERROR': 'TEC-001',
+            'NETWORK_ERROR': 'TEC-002',
+            'TIMEOUT_ERROR': 'TEC-003',
+            'CONFIGURATION_ERROR': 'TEC-004'
+        }
+    }
+    
+    # Error Messages (Non-I/O strings)
+    ERROR_MESSAGES = {
+        'VALIDATION': {
+            'INVALID_EMAIL': 'Email không hợp lệ',
+            'REQUIRED_FIELD': 'Trường này là bắt buộc',
+            'INVALID_LENGTH': 'Độ dài không hợp lệ',
+            'INVALID_FORMAT': 'Định dạng không hợp lệ'
+        },
+        'BUSINESS': {
+            'USER_NOT_FOUND': 'Không tìm thấy người dùng',
+            'INSUFFICIENT_BALANCE': 'Số dư không đủ',
+            'DUPLICATE_ENTRY': 'Bản ghi đã tồn tại',
+            'INVALID_STATE': 'Trạng thái không hợp lệ'
+        },
+        'TECHNICAL': {
+            'DATABASE_ERROR': 'Lỗi cơ sở dữ liệu',
+            'NETWORK_ERROR': 'Lỗi kết nối mạng',
+            'TIMEOUT_ERROR': 'Hết thời gian chờ',
+            'CONFIGURATION_ERROR': 'Lỗi cấu hình'
+        }
+    }
+```
+
+#### 5.5.7 Global Constants Usage
+```python
+# app/constants/__init__.py
+from .global_constants import GLOBAL_CONSTANTS
+from .business_constants import BusinessConstants
+from .technical_constants import TechnicalConstants
+from .ui_constants import UiConstants
+from .validation_constants import ValidationConstants
+from .error_constants import ErrorConstants
+
+# Export all constants
+__all__ = [
+    'GLOBAL_CONSTANTS',
+    'BusinessConstants', 
+    'TechnicalConstants',
+    'UiConstants',
+    'ValidationConstants',
+    'ErrorConstants'
+]
+
+# Usage examples
+def validate_order_items(count: int) -> bool:
+    return count <= GLOBAL_CONSTANTS.MAX_ORDER_ITEMS
+
+def get_supported_currencies() -> List[str]:
+    return BusinessConstants.SUPPORTED_CURRENCIES
+
+def validate_email(email: str) -> bool:
+    return ValidationConstants.EMAIL_PATTERN.match(email) is not None
+```
+
+#### 5.5.8 Constants Import Rules
+```python
+# Correct usage in different layers
+# Domain layer
+from app.constants import GLOBAL_CONSTANTS, BusinessConstants
+
+# Application layer  
+from app.constants import GLOBAL_CONSTANTS, ValidationConstants
+
+# Infrastructure layer
+from app.constants import GLOBAL_CONSTANTS, TechnicalConstants
+
+# Interfaces layer
+from app.constants import GLOBAL_CONSTANTS, UiConstants
+```
+
+#### 5.5.9 Constants Best Practices
+- **Single Global Instance**: Chỉ có một instance của GlobalConstants
+- **Immutable Constants**: Sử dụng `@dataclass(frozen=True)`
+- **Type Safety**: Type hints cho tất cả constants
+- **Centralized Management**: Tất cả constants ở một nơi
+- **Layer Separation**: Tách constants theo layer responsibility
+- **No Hardcoding**: Không hardcode values trong business logic
+- **Environment Awareness**: Hỗ trợ different values cho different environments
+
 ============================================================================
 ## 6) YÊU CẦU PHI CHỨC NĂNG
 
