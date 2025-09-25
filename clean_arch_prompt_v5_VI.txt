@@ -23,6 +23,10 @@ một **skeleton dự án Python production-grade** với code, wiring, tests, d
 tuân thủ nghiêm ngặt backbone này. Nếu có gì mơ hồ, chỉ hỏi **một** câu hỏi làm rõ duy nhất nếu nó
 chặn tính chính xác; nếu không thì chọn safe defaults bảo toàn backbone.
 
+> **🔧 NGÔN NGỮ MẶC ĐỊNH**: Prompt này được thiết kế cho **Python** với các ví dụ code bằng Python.
+> Các nguyên tắc kiến trúc có thể áp dụng cho mọi ngôn ngữ, nhưng syntax và patterns cần được 
+> chuyển đổi phù hợp với ngôn ngữ đích.
+
 ============================================================================
 ## 1) VAI TRÒ & ĐẢM BẢO
 - Cung cấp code sạch, có thể test, có type hints và chạy được.
@@ -2839,7 +2843,13 @@ class DITestUtils:
 ============================================================================
 ## 10) TOOLING & CẤU HÌNH
 
-### 10.1 Core Tooling
+### 10.1 Core Tooling (Python)
+> **🐍 PYTHON TOOLING**: Các tooling được liệt kê dưới đây dành cho **Python ecosystem**.
+> Khi áp dụng cho ngôn ngữ khác, hãy chuyển đổi sang tooling tương ứng:
+> - Java: Maven/Gradle, Checkstyle, SpotBugs, JUnit
+> - C#: .NET CLI, StyleCop, SonarQube, xUnit
+> - TypeScript: ESLint, Prettier, Jest, TypeScript compiler
+
 - `pyproject.toml`: ruff (lint+format), black (optional), mypy (strict), pytest, hypothesis.
 - `.pre-commit-config.yaml`: ruff, ruff‑format or black, mypy, import‑linter, bandit, pip‑audit.
 - `architecture.ini`: layered imports (domain; application; infrastructure; interfaces) + forbidden cross‑layer edges.
@@ -3233,6 +3243,21 @@ class LibraryMonitor:
 - **Update** thường xuyên
 - **Monitor** security advisories
 - **Implement** security best practices
+
+---
+
+## 📋 TÓM TẮT NGÔN NGỮ & TOOLING
+
+> **🎯 LƯU Ý CUỐI CÙNG**: Prompt này được thiết kế cho **Python** với:
+> - **Code examples**: Python syntax và patterns
+> - **Tooling**: Python ecosystem (ruff, mypy, pytest, etc.)
+> - **Dependencies**: Python packages (requests, fastapi, sqlalchemy, etc.)
+> 
+> **Khi áp dụng cho ngôn ngữ khác**, hãy:
+> 1. **Giữ nguyên** các nguyên tắc kiến trúc (Clean Architecture, SOLID)
+> 2. **Chuyển đổi** syntax và patterns phù hợp với ngôn ngữ đích
+> 3. **Thay thế** tooling bằng ecosystem tương ứng
+> 4. **Adapt** dependency management cho ngôn ngữ đó
 
 ---
 
