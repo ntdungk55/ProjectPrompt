@@ -2876,7 +2876,15 @@ class DITestUtils:
 - List affected layers và new modules/files. Choose safe defaults (ví dụ: SQLite cho demo persistence).
 - Declare minimal external dependencies. Note assumptions.
 
+### STEP 2.5 — KIỂM TRA TỒN TẠI & TƯƠNG THÍCH VỚI CODE HIỆN TẠI (BẮT BUỘC)
+- Trước khi tạo mới bất kỳ file/class/function/module nào, phải rà soát codebase để kiểm tra xem thành phần đó đã tồn tại hay chưa (theo tên, vai trò, và hành vi tương đương).
+- Nếu đã tồn tại, ưu tiên mở rộng/tái sử dụng/thay đổi có kiểm soát thay vì tạo trùng lặp. Tuyệt đối không tạo song song hai thực thể có cùng trách nhiệm.
+- Nếu khác tên nhưng cùng vai trò, cân nhắc hợp nhất hoặc refactor nhẹ để loại bỏ trùng lặp.
+- Bảo toàn ranh giới layer (Domain/Application/Infrastructure/Interfaces) và quy ước đặt tên hiện có; không đưa logic sai layer.
+- Khi thay đổi hành vi, cập nhật wiring DI, imports, và tests liên quan; ghi chú migration/backward‑compat nếu có breaking changes.
+
 ### STEP 3 — SCAFFOLD CODE & FILES
+- Chỉ scaffold các thành phần CHƯA tồn tại (sau STEP 2.5). Nếu thành phần đã có, cập nhật/mở rộng thay vì tạo mới.
 - Output full file tree + minimal runnable stubs. Respect ALL conventions (length, complexity, returns, nesting, one‑class‑per‑file, no globals).
 - Generate DI wiring và demo entrypoint (MCP/REST/CLI).
 
@@ -2888,7 +2896,9 @@ class DITestUtils:
 - Print a short checklist và mark pass/fail cho:
   - R‑LEN‑001 (≤100 chars/line), R‑CMP‑010 (complexity), R‑RET‑003 (≤3 returns),
     R‑ARGS‑006 (≤6 params), R‑FILE‑CLS‑001 (1 public class/file),
-    R‑GLOB‑002 (no globals), R‑DOC‑010 (docstrings/typing), R‑LAY‑ARCH‑100 (imports).
+    R‑GLOB‑002 (no globals), R‑DOC‑010 (docstrings/typing), R‑LAY‑ARCH‑100 (imports),
+    R‑DUP‑010 (không tạo trùng file/type/function/module), R‑COMP‑020 (tương thích DI/wiring hiện có),
+    R‑BWC‑030 (không phá vỡ public API trừ khi có migration/notes rõ ràng).
 - Nếu any **must** rule fails, FIX và re‑check before returning.
 
 ### STEP 6 — USAGE & DEMO
@@ -3027,20 +3037,7 @@ Khi AI tự động thêm thư viện vào dự án, phải cung cấp thông ti
   - urllib3: Low-level, more control
   ```
 
-#### 12.2.5 Ưu Nhược Điểm
-- **Ưu điểm**:
-  - Dễ sử dụng, API đơn giản
-  - Hỗ trợ tốt cho testing
-  - Community lớn, documentation tốt
-  - Performance ổn định
-- **Nhược điểm**:
-  - Không hỗ trợ async native
-  - Memory usage cao với large responses
-  - Không hỗ trợ HTTP/2
-- **Rủi ro**: Security vulnerabilities, breaking changes
-- **Mitigation**: Regular updates, security scanning
-
-#### 12.2.6 Tự Động Update
+#### 12.2.5Tự Động Update
 - **Update strategy**: Major, minor, patch updates
 - **Breaking changes**: Cách xử lý breaking changes
 - **Testing**: Cách test sau khi update
