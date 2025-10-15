@@ -110,7 +110,7 @@ DEPENDENCY FLOW: ─────────────────────
 | Domain import DTO từ vendor | ACL mapper chuyển vendor DTO → Domain entity |
 | Hardcode URL trong Use Case | URL trong Infrastructure constants, inject via config |
 | Service locator trong Domain | Constructor injection via DI container |
-| Mutable DTOs cross boundaries | `@dataclass(frozen=True)` cho tất cả DTOs |
+| Mutable DTOs cross boundaries | Immutable data structures cho tất cả DTOs |
 | Domain entity với JSON serialization | Mapper layer chuyển Entity → DTO → JSON |
 
 ### 2.4 Why These Principles?
@@ -340,18 +340,18 @@ CreateUserCommandV1Dto            → Versioned command (V1)
 
 #### ⚠️ CRITICAL RULES (BẮT BUỘC)
 ```
-✅ ALWAYS frozen=True              → All DTOs, VOs, UI Models
-✅ ALWAYS docstring                → Every DTO/UI Model must explain Purpose/Used by/Reason
-✅ ALWAYS type hints               → Full type annotations
-✅ ALWAYS tuple not list           → Collections in frozen dataclasses
+✅ ALWAYS immutable                → All DTOs, VOs, UI Models
+✅ ALWAYS documentation            → Every DTO/UI Model must explain Purpose/Used by/Reason
+✅ ALWAYS type annotations         → Full static typing
+✅ ALWAYS immutable collections    → Use immutable/readonly collections
 ✅ ALWAYS separate layers          → No Entity as Dto, no cross-layer reuse
 ✅ ALWAYS ISO-8601                 → Datetime at all boundaries
 ✅ UI Models NO "Dto" suffix       → UserUiModel (NOT UserUiModelDto)
 
 ❌ NEVER Entity as Dto             → Separate types always
-❌ NEVER mutable collections       → Use tuple, frozenset
-❌ NEVER skip frozen=True          → For DTOs/VOs/UI Models
-❌ NEVER skip docstring            → Explain every DTO/UI Model
+❌ NEVER mutable collections       → Use immutable/readonly collections
+❌ NEVER skip immutability         → For DTOs/VOs/UI Models
+❌ NEVER skip documentation        → Explain every DTO/UI Model
 ❌ NEVER vendor types in Domain    → Keep domain pure
 ❌ NEVER "Dto" suffix for UI       → UI Models are view models, not DTOs
 ```
@@ -391,103 +391,44 @@ CreateUserCommandV1Dto            → Versioned command (V1)
 #### Application DTOs (Ports layer `application/dto/`)
 
 **⚠️ YÊU CẦU BẮT BUỘC CHO TẤT CẢ DTOs:**
-1. **Frozen dataclass:** Tất cả DTO PHẢI dùng `@dataclass(frozen=True)` để đảm bảo immutability.
-2. **Docstring:** Mỗi DTO PHẢI có docstring giải thích:
+1. **Immutable structure:** Tất cả DTO PHẢI là immutable để đảm bảo thread-safety và predictability.
+2. **Documentation:** Mỗi DTO PHẢI có documentation giải thích:
    - Mục đích/trách nhiệm của DTO
    - Lý do tạo ra DTO này (use case nào sử dụng, tại sao cần tách biệt)
    - Layer/boundary nào sử dụng
-3. **Type hints:** Tất cả fields PHẢI có type annotation đầy đủ.
+3. **Type annotations:** Tất cả fields PHẢI có type annotation đầy đủ.
 
 **Naming Patterns:**
 
 - **Command DTO (Input cho Use Case thay đổi state):** `{Action}{Entity}CommandDto`
   Ví dụ: `CreateUserCommandDto`, `UpdateOrderCommandDto`, `DeleteProductCommandDto`.
-  ```python
-  @dataclass(frozen=True)
-  class CreateUserCommandDto:
-      """
-      Command DTO for creating a new user.
-      
-      Purpose: Encapsulates all data required for user creation use case.
-      Used by: CreateUser use case at Application layer boundary.
-      Reason: Separates external input validation from domain logic.
-      """
-      name: str
-      email: str
-      password: str
-  ```
+  - Purpose: Encapsulates data required for state-changing operations
+  - Used by: Use cases at Application layer boundary
+  - Fields: Immutable with full type annotations
 
 - **Query DTO (Input cho Use Case chỉ đọc):** `{Action}{Entity}QueryDto`
   Ví dụ: `GetUserQueryDto`, `SearchOrdersQueryDto`, `ListProductsQueryDto`.
-  ```python
-  @dataclass(frozen=True)
-  class SearchOrdersQueryDto:
-      """
-      Query DTO for searching orders with filters.
-      
-      Purpose: Encapsulates search criteria for order queries.
-      Used by: SearchOrders use case at Application layer boundary.
-      Reason: Provides type-safe query parameters, prevents SQL injection.
-      """
-      customer_id: str | None = None
-      status: str | None = None
-      from_date: str | None = None  # ISO-8601
-      to_date: str | None = None    # ISO-8601
-      page: int = 1
-      page_size: int = 20
-  ```
+  - Purpose: Encapsulates search/filter criteria
+  - Supports: Optional filters, pagination, sorting
+  - Fields: Immutable with default values for optional parameters
 
 - **Response DTO (Output từ Use Case):** `{Action}{Entity}ResponseDto` hoặc `{Entity}ResponseDto`
   Ví dụ: `CreateUserResponseDto`, `UserResponseDto`, `OrderResponseDto`, `PagedOrdersResponseDto`.
-  ```python
-  @dataclass(frozen=True)
-  class CreateUserResponseDto:
-      """
-      Response DTO for user creation operation.
-      
-      Purpose: Returns created user data to presentation layer.
-      Used by: CreateUser use case output.
-      Reason: Prevents exposure of internal entity details, controls API contract.
-      """
-      user_id: str
-      name: str
-      email: str
-      created_at: str  # ISO-8601
-  ```
+  - Purpose: Returns data to presentation layer
+  - Controls: API contract, prevents entity exposure
+  - Fields: Immutable, ISO-8601 for dates
 
 - **Result DTO (Intermediate results giữa các tầng):** `{Entity}ResultDto`
   Ví dụ: `UserResultDto`, `OrderResultDto`, `ValidationResultDto`.
-  ```python
-  @dataclass(frozen=True)
-  class ValidationResultDto:
-      """
-      Result DTO for validation operations.
-      
-      Purpose: Carries validation results between application components.
-      Used by: Validation workflows in Application layer.
-      Reason: Standardizes validation output format across use cases.
-      """
-      is_valid: bool
-      errors: tuple[str, ...]  # Use tuple for immutability
-  ```
+  - Purpose: Carries operation results between components
+  - Used by: Validation workflows, processing pipelines
+  - Fields: Immutable result data with success/error indicators
 
 - **Event DTO (Domain events serialized):** `{Entity}EventDto`
   Ví dụ: `UserCreatedEventDto`, `OrderPlacedEventDto`.
-  ```python
-  @dataclass(frozen=True)
-  class UserCreatedEventDto:
-      """
-      Event DTO for user creation domain event.
-      
-      Purpose: Serialized representation of UserCreated domain event.
-      Used by: Event bus/message queue at infrastructure boundary.
-      Reason: Decouples domain events from message broker schema.
-      """
-      event_id: str
-      user_id: str
-      occurred_at: str  # ISO-8601
-      user_data: dict[str, Any]
-  ```
+  - Purpose: Serialized representation of domain events
+  - Used by: Event bus, message queue, event sourcing
+  - Fields: Immutable event data with metadata (event_id, occurred_at)
 
 - **Versioning:** chèn `V1`, `V2` **trước** hậu tố `Dto`.
   Ví dụ: `CreateUserCommandV2Dto`, `UserResponseV1Dto`.
@@ -497,85 +438,32 @@ CreateUserCommandV1Dto            → Versioned command (V1)
     Ví dụ: `UserListResponseDto`, `OrdersResponseDto`.
   - Phân trang: `Paged{Entity}sResponseDto`
     Ví dụ: `PagedUsersResponseDto`, `PagedOrdersResponseDto`.
-  ```python
-  @dataclass(frozen=True)
-  class PagedUsersResponseDto:
-      """
-      Paginated response DTO for user listings.
-      
-      Purpose: Standardized pagination wrapper for user collections.
-      Used by: List/Search user use cases output.
-      Reason: Consistent pagination contract across all list endpoints.
-      """
-      items: tuple[UserResponseDto, ...]  # Use tuple for immutability
-      page: int
-      page_size: int
-      total: int
-      has_next: bool
-  ```
+  - Fields: items (immutable collection), page, page_size, total, has_next
 
 - **Trường trong DTO:** 
-  - Bám sát schema provider (giữ `snake_case` nếu API như vậy)
-  - Domain sẽ map sang camelCase khi cần
-  - Prefer immutable types: `tuple` thay vì `list`, `frozenset` thay vì `set`
+  - Bám sát schema provider (giữ naming convention phù hợp)
+  - Domain sẽ map sang convention riêng khi cần
+  - Prefer immutable collections (readonly arrays, immutable lists)
 
 #### Infrastructure Layer
 
 - **External Provider Request DTO:** `{Provider}{Entity}RequestDto`
   Ví dụ: `GoogleMapsRouteRequestDto`, `StripePaymentRequestDto`, `Auth0UserRequestDto`.
-  ```python
-  @dataclass(frozen=True)
-  class StripePaymentRequestDto:
-      """
-      Request DTO for Stripe payment API.
-      
-      Purpose: Encapsulates data for Stripe payment API calls.
-      Used by: Stripe payment gateway adapter in Infrastructure layer.
-      Reason: Isolates external API schema from domain, enables provider switching.
-      """
-      amount: int  # Amount in cents
-      currency: str
-      source: str
-      description: str
-  ```
+  - Purpose: Encapsulates data for external API calls
+  - Used by: Provider gateway adapters in Infrastructure layer
+  - Reason: Isolates external API schema from domain
 
 - **External Provider Response DTO:** `{Provider}{Entity}ResponseDto`
   Ví dụ: `GoogleMapsRouteResponseDto`, `StripePaymentResponseDto`, `Auth0UserResponseDto`.
-  ```python
-  @dataclass(frozen=True)
-  class StripePaymentResponseDto:
-      """
-      Response DTO from Stripe payment API.
-      
-      Purpose: Captures Stripe API response data.
-      Used by: Stripe payment gateway adapter in Infrastructure layer.
-      Reason: Maps external API response to internal types via ACL.
-      """
-      payment_id: str
-      status: str
-      amount: int
-      created: int  # Unix timestamp
-  ```
+  - Purpose: Captures external API response data
+  - Used by: Provider gateway adapters, ACL mappers
+  - Reason: Maps external responses to internal types via ACL
 
 - **Database Models:** `{Database}{Entity}ModelDto` hoặc `{Entity}Entity` (ưu tiên `Entity`)
   Ví dụ: `UserEntity`, `OrderEntity`, `PostgresUserModelDto` (nếu cần phân biệt DB).
-  ```python
-  @dataclass(frozen=True)
-  class UserEntity:
-      """
-      Database entity for user persistence.
-      
-      Purpose: ORM model for users table in PostgreSQL.
-      Used by: UserSqlRepository in Infrastructure layer.
-      Reason: Separates persistence schema from domain model.
-      """
-      id: str
-      name: str
-      email: str
-      password_hash: str
-      created_at: str
-      updated_at: str
-  ```
+  - Purpose: ORM/persistence models for database tables
+  - Used by: Repository implementations in Infrastructure layer
+  - Reason: Separates persistence schema from domain model
 
 - **Bảng nối/khóa tổng hợp:** `{Entity1}{Entity2}LinkEntity`, `{Entity1}{Entity2}CrossRefEntity`.
   Ví dụ: `UserOrderLinkEntity`, `ProductCategoryLinkEntity`.
@@ -586,116 +474,51 @@ CreateUserCommandV1Dto            → Versioned command (V1)
 #### Interfaces Layer (UI-facing Models)
 
 **⚠️ YÊU CẦU BẮT BUỘC CHO UI MODELS:**
-1. **Frozen dataclass:** Tất cả UI model PHẢI dùng `@dataclass(frozen=True)`.
-2. **Docstring:** Mỗi UI model PHẢI giải thích mục đích hiển thị.
-3. **Type hints:** Đầy đủ type annotation.
+1. **Immutable structure:** Tất cả UI model PHẢI là immutable.
+2. **Documentation:** Mỗi UI model PHẢI giải thích mục đích hiển thị.
+3. **Type annotations:** Đầy đủ type annotation.
 4. **KHÔNG dùng hậu tố Dto:** UI models là view models/presentation models, không phải DTOs.
 
 - **UI Model (Presentation data):** `{Entity}UiModel`
   Ví dụ: `UserUiModel`, `OrderUiModel`, `DashboardUiModel`.
-  ```python
-  @dataclass(frozen=True)
-  class UserUiModel:
-      """
-      UI model for user display in presentation layer.
-      
-      Purpose: Optimized user data format for UI rendering.
-      Used by: User profile views, user list components.
-      Reason: Includes only UI-relevant fields, pre-formatted for display.
-      """
-      display_name: str
-      email: str
-      avatar_url: str
-      role_label: str  # Human-readable role
-      status_badge: str  # "Active" | "Inactive" | "Suspended"
-      member_since: str  # Formatted date: "January 2024"
-  ```
+  - Purpose: Optimized data format for UI rendering
+  - Fields: Pre-formatted strings, human-readable values, UI-relevant only
+  - Reason: Includes only display fields, omits sensitive data
 
 - **UI State (Component state):** `{Feature}UiState`
   Ví dụ: `UserProfileUiState`, `OrderListUiState`, `LoginFormUiState`.
-  ```python
-  @dataclass(frozen=True)
-  class OrderListUiState:
-      """
-      UI state for order list page.
-      
-      Purpose: Manages order list view state.
-      Used by: Order list component/controller.
-      Reason: Centralizes UI state management, enables state persistence.
-      """
-      orders: tuple[OrderUiModel, ...]
-      is_loading: bool
-      selected_filter: str
-      current_page: int
-      error_message: str | None = None
-  ```
+  - Purpose: Manages component view state
+  - Fields: Data collections, loading flags, filter/pagination state
+  - Reason: Centralizes UI state management
 
 - **UI Event (User actions):** `{Feature}UiEvent`
   Ví dụ: `UserClickedSubmitEvent`, `OrderFilterChangedEvent`.
-  ```python
-  @dataclass(frozen=True)
-  class OrderFilterChangedEvent:
-      """
-      UI event when order filter changes.
-      
-      Purpose: Captures user filter interaction.
-      Used by: Order list event handlers.
-      Reason: Type-safe event payload for state updates.
-      """
-      filter_type: str  # "status" | "date" | "customer"
-      filter_value: str
-      timestamp: str  # ISO-8601
-  ```
+  - Purpose: Captures user interactions
+  - Fields: Event type, payload data, timestamp
+  - Reason: Type-safe event payloads for state updates
 
 - **UI Effect (Side effects):** `{Feature}UiEffect`
   Ví dụ: `ShowNotificationEffect`, `NavigateToPageEffect`, `ScrollToTopEffect`.
-  ```python
-  @dataclass(frozen=True)
-  class ShowNotificationEffect:
-      """
-      UI effect for showing notification.
-      
-      Purpose: Declarative notification display instruction.
-      Used by: UI effect handlers in presentation layer.
-      Reason: Decouples business logic from UI side effects.
-      """
-      message: str
-      notification_type: str  # "success" | "error" | "warning" | "info"
-      duration_ms: int = 3000
-  ```
+  - Purpose: Declarative side effect instructions
+  - Fields: Effect type, parameters, duration/options
+  - Reason: Decouples business logic from UI side effects
 
 - **Form Model (Form input/validation):** `{Feature}Form`
   Ví dụ: `LoginForm`, `CreateOrderForm`, `UserProfileForm`.
-  ```python
-  @dataclass(frozen=True)
-  class CreateOrderForm:
-      """
-      Form model for order creation.
-      
-      Purpose: Captures and validates order form input.
-      Used by: Order creation form component.
-      Reason: Client-side validation before sending to backend.
-      """
-      customer_id: str
-      product_ids: tuple[str, ...]
-      shipping_address: str
-      notes: str = ""
-  ```
+  - Purpose: Captures and validates form input
+  - Fields: Form input fields with validation rules
+  - Reason: Client-side validation before backend submission
 
 #### Mapper/Translator Naming
-- **Hàm/Method:** `to_domain()`, `to_dto()`, `to_entity()`, `to_ui_model()`, `to_command()`, `to_query()`.
-  ```python
-  def to_domain(dto: CreateUserCommandDto) -> User:
-      """Convert command DTO to domain entity."""
-      return User(name=dto.name, email=dto.email)
+- **Methods:** `toDomain()`, `toDto()`, `toEntity()`, `toUiModel()`, `toCommand()`, `toQuery()`
+  - Purpose: Convert between layer types
+  - Pattern: Explicit conversion method names
+  - Example: User entity ↔ UserResponseDto ↔ UserUiModel
   
-  def to_dto(entity: User) -> UserResponseDto:
-      """Convert domain entity to response DTO."""
-      return UserResponseDto(user_id=entity.id, name=entity.name, email=entity.email)
-  ```
-  
-- **File/Type tổng hợp:** `{Entity}Mapper`, `{Entity}Translator`.
-  Ví dụ: `UserMapper`, `OrderMapper`, `RouteTranslator`.
+- **Classes:** `{Entity}Mapper`, `{Entity}Translator`
+  Ví dụ: `UserMapper`, `OrderMapper`, `RouteTranslator`
+  - Purpose: Centralize mapping logic for entities
+  - Contains: All conversion methods for one entity type
   
 - **ACL Mappers (Anti-Corruption Layer):** `{Provider}{Entity}Mapper`.
   Ví dụ: `StripePaymentMapper`, `GoogleMapsRouteMapper`, `Auth0UserMapper`.
@@ -877,106 +700,153 @@ CreateUserCommandV1Dto            → Versioned command (V1)
 ### 4.3 Ví Dụ Thực Tế (Essential Examples Only)
 
 **Example 1: Command DTO với đầy đủ documentation**
-```python
-# File: app/application/dto/create_user_command_dto.py
-from dataclasses import dataclass
-from typing import Literal
+```typescript
+// File: app/application/dto/CreateUserCommandDto.ts
+export interface CreateUserCommandDto {
+    /**
+     * Command DTO for creating a new user in the system.
+     * 
+     * Purpose:
+     *     Encapsulates all required and optional data for user creation.
+     *     Validates input at the application boundary before reaching domain.
+     *     
+     * Used by:
+     *     - CreateUser use case (application/use_cases/CreateUser.ts)
+     *     - User registration API endpoint (interfaces/api/v1/users.ts)
+     *     
+     * Reason:
+     *     Separates external API input validation from domain user creation logic.
+     *     Allows API schema to evolve independently of domain model.
+     *     Prevents exposing domain entity constructors directly to external clients.
+     */
+    readonly name: string;
+    readonly email: string;
+    readonly password: string;  // Plain text, will be hashed in domain
+    readonly role?: "admin" | "customer" | "guest";  // Default: "customer"
+}
 
-@dataclass(frozen=True)
-class CreateUserCommandDto:
-    """
-    Command DTO for creating a new user in the system.
-    
-    Purpose:
-        Encapsulates all required and optional data for user creation.
-        Validates input at the application boundary before reaching domain.
-        
-    Used by:
-        - CreateUser use case (application/use_cases/create_user.py)
-        - User registration API endpoint (interfaces/api/v1/users.py)
-        
-    Reason:
-        Separates external API input validation from domain user creation logic.
-        Allows API schema to evolve independently of domain model.
-        Prevents exposing domain entity constructors directly to external clients.
-        
-    Example:
-        >>> cmd = CreateUserCommandDto(
-        ...     name="John Doe",
-        ...     email="john@example.com",
-        ...     password="secure_password_123",
-        ...     role="customer"
-        ... )
-        >>> result = create_user_use_case.execute(cmd)
-    """
-    name: str
-    email: str
-    password: str  # Plain text, will be hashed in domain
-    role: Literal["admin", "customer", "guest"] = "customer"
-    
-    def __post_init__(self) -> None:
-        """
-        Validation logic for DTO fields.
-        
-        Note: Only basic format validation here.
-        Business rules validated in domain layer.
-        """
-        if not self.name or len(self.name.strip()) == 0:
-            raise ValueError("Name cannot be empty")
-        if not self.email or "@" not in self.email:
-            raise ValueError("Invalid email format")
-        if len(self.password) < 8:
-            raise ValueError("Password must be at least 8 characters")
+// Validation function
+export function validateCreateUserCommand(cmd: CreateUserCommandDto): void {
+    if (!cmd.name || cmd.name.trim().length === 0) {
+        throw new Error("Name cannot be empty");
+    }
+    if (!cmd.email || !cmd.email.includes("@")) {
+        throw new Error("Invalid email format");
+    }
+    if (cmd.password.length < 8) {
+        throw new Error("Password must be at least 8 characters");
+    }
+}
+```
+
+```java
+// Java alternative with record (Java 14+)
+// File: app/application/dto/CreateUserCommandDto.java
+package app.application.dto;
+
+/**
+ * Command DTO for creating a new user in the system.
+ * 
+ * Purpose: Encapsulates all required and optional data for user creation.
+ * Used by: CreateUser use case, User registration API endpoint
+ * Reason: Separates API input validation from domain user creation logic.
+ */
+public record CreateUserCommandDto(
+    String name,
+    String email,
+    String password,
+    UserRole role  // enum: ADMIN, CUSTOMER, GUEST
+) {
+    // Compact constructor for validation
+    public CreateUserCommandDto {
+        if (name == null || name.isBlank()) {
+            throw new IllegalArgumentException("Name cannot be empty");
+        }
+        if (email == null || !email.contains("@")) {
+            throw new IllegalArgumentException("Invalid email format");
+        }
+        if (password.length() < 8) {
+            throw new IllegalArgumentException("Password must be at least 8 characters");
+        }
+        if (role == null) {
+            role = UserRole.CUSTOMER;
+        }
+    }
+}
 ```
 
 **Example 2: Provider-specific DTO (Anti-Corruption Layer)**
-```python
-# File: app/infrastructure/stripe/dto/stripe_payment_request_dto.py
-from dataclasses import dataclass
+```typescript
+// File: app/infrastructure/stripe/dto/StripePaymentRequestDto.ts
+export interface StripePaymentRequestDto {
+    /**
+     * Request DTO for Stripe Payment Intent API.
+     * 
+     * Purpose:
+     *     Encapsulates data required for creating a Stripe payment intent.
+     *     Maps internal payment data to Stripe-specific schema.
+     *     
+     * Used by:
+     *     - StripePaymentGateway adapter (infrastructure/stripe/gateway.ts)
+     *     - StripePaymentMapper ACL (infrastructure/stripe/acl/mapper.ts)
+     *     
+     * Reason:
+     *     Isolates Stripe API schema from domain payment model.
+     *     Enables switching payment providers without domain changes.
+     *     Centralizes Stripe-specific field transformations.
+     *     Documents Stripe API requirements explicitly.
+     *     
+     * Stripe API Reference: https://stripe.com/docs/api/payment_intents/create
+     */
+    readonly amount: number;  // Amount in cents (e.g., 1000 = $10.00)
+    readonly currency: string;  // Must be lowercase: "usd", "eur", etc.
+    readonly source: string;
+    readonly description: string;
+    readonly metadata?: Record<string, string>;
+}
 
-@dataclass(frozen=True)
-class StripePaymentRequestDto:
-    """
-    Request DTO for Stripe Payment Intent API.
-    
-    Purpose:
-        Encapsulates data required for creating a Stripe payment intent.
-        Maps internal payment data to Stripe-specific schema.
-        
-    Used by:
-        - StripePaymentGateway adapter (infrastructure/stripe/gateway.py)
-        - StripePaymentMapper ACL (infrastructure/stripe/acl/mapper.py)
-        
-    Reason:
-        Isolates Stripe API schema from domain payment model.
-        Enables switching payment providers without domain changes.
-        Centralizes Stripe-specific field transformations.
-        Documents Stripe API requirements explicitly.
-        
-    Stripe API Reference:
-        https://stripe.com/docs/api/payment_intents/create
-        
-    Fields:
-        amount: Amount in cents (Stripe requirement)
-        currency: ISO 4217 currency code (lowercase per Stripe)
-        source: Payment source ID (card token or source object)
-        description: Payment description for Stripe dashboard
-        metadata: Custom key-value pairs for tracking
-    """
-    amount: int  # Amount in cents (e.g., 1000 = $10.00)
-    currency: str  # Must be lowercase: "usd", "eur", etc.
-    source: str
-    description: str
-    metadata: dict[str, str] | None = None
-    
-    def __post_init__(self) -> None:
-        """Validate Stripe-specific constraints."""
-        if self.amount < 0:
-            raise ValueError("Amount must be non-negative")
-        if self.currency != self.currency.lower():
-            raise ValueError("Currency must be lowercase per Stripe API")
-        if len(self.description) > 1000:
-            raise ValueError("Description max length is 1000 chars")
+// Validation function
+export function validateStripePaymentRequest(dto: StripePaymentRequestDto): void {
+    if (dto.amount < 0) {
+        throw new Error("Amount must be non-negative");
+    }
+    if (dto.currency !== dto.currency.toLowerCase()) {
+        throw new Error("Currency must be lowercase per Stripe API");
+    }
+    if (dto.description.length > 1000) {
+        throw new Error("Description max length is 1000 chars");
+    }
+}
+```
+
+```csharp
+// C# alternative with record
+// File: app/infrastructure/stripe/dto/StripePaymentRequestDto.cs
+namespace App.Infrastructure.Stripe.Dto;
+
+/// <summary>
+/// Request DTO for Stripe Payment Intent API.
+/// Purpose: Encapsulates data required for Stripe payment intent creation.
+/// Reason: Isolates Stripe API schema from domain payment model.
+/// </summary>
+public record StripePaymentRequestDto(
+    int Amount,  // Amount in cents (e.g., 1000 = $10.00)
+    string Currency,  // Must be lowercase: "usd", "eur", etc.
+    string Source,
+    string Description,
+    Dictionary<string, string>? Metadata = null
+)
+{
+    public void Validate()
+    {
+        if (Amount < 0)
+            throw new ArgumentException("Amount must be non-negative");
+        if (Currency != Currency.ToLowerInvariant())
+            throw new ArgumentException("Currency must be lowercase per Stripe API");
+        if (Description.Length > 1000)
+            throw new ArgumentException("Description max length is 1000 chars");
+    }
+}
 ```
 
 > 💡 **Lưu ý**: Tham khảo thêm các ví dụ khác (Query DTO, Response DTO, UI Model, Event DTO) 
@@ -987,56 +857,60 @@ class StripePaymentRequestDto:
 ### 4.4 Tiêu Chuẩn Code Chung
 
 #### Language & Type Safety
-- **Python 3.11+** với full type hints cho tất cả code.
-- **BẮT BUỘC `@dataclass(frozen=True)`** cho:
+- **Modern statically-typed language** (e.g., TypeScript, Java, C#, Kotlin, Rust, Go, Swift)
+- **Full type annotations** cho tất cả code
+- **BẮT BUỘC IMMUTABLE data structures** cho:
   - Tất cả DTOs (Command, Query, Response, Result, Event) - Application/Infrastructure
   - Tất cả Value Objects trong Domain
   - Tất cả UI Models (UiModel, UiState, UiEvent, UiEffect, Form) - Interfaces layer
-  - Bất kỳ data class nào cross boundaries giữa các layers
-  ```python
-  # ✅ CORRECT - Always frozen for DTOs
-  from dataclasses import dataclass
+  - Bất kỳ data structure nào cross boundaries giữa các layers
   
-  @dataclass(frozen=True)
-  class CreateUserCommandDto:
-      """Command DTO - must be immutable."""
-      name: str
-      email: str
+  ```typescript
+  // ✅ CORRECT - Immutable DTOs (TypeScript)
+  interface CreateUserCommandDto {
+      readonly name: string;
+      readonly email: string;
+  }
   
-  @dataclass(frozen=True)
-  class Money:
-      """Value Object - must be immutable."""
-      amount: Decimal
-      currency: str
+  interface Money {
+      readonly amount: number;
+      readonly currency: string;
+  }
   
-  @dataclass(frozen=True)
-  class UserUiModel:
-      """UI Model - must be immutable (NO "Dto" suffix)."""
-      display_name: str
-      email: str
+  interface UserUiModel {
+      readonly displayName: string;
+      readonly email: string;
+  }
   ```
   
-- **KHÔNG BẮT BUỘC `frozen=True`** cho:
+  ```java
+  // ✅ CORRECT - Immutable DTOs (Java with records)
+  public record CreateUserCommandDto(String name, String email) {}
+  public record Money(BigDecimal amount, String currency) {}
+  public record UserUiModel(String displayName, String email) {}
+  ```
+  
+- **KHÔNG BẮT BUỘC immutability** cho:
   - Domain Entities (có thể mutable nếu business logic yêu cầu)
   - Internal helpers/builders (không cross boundaries)
-  ```python
-  # ✅ OK - Entity có thể mutable
-  @dataclass
-  class User:
-      """Domain entity - may have mutable behavior."""
-      id: UserId
-      name: str
-      email: str
+  
+  ```typescript
+  // ✅ OK - Entity có thể mutable
+  class User {
+      private id: UserId;
+      private name: string;
+      private email: string;
       
-      def update_email(self, new_email: str) -> None:
-          """Mutable operation on entity."""
-          self.email = new_email
+      updateEmail(newEmail: string): void {
+          this.email = newEmail;
+      }
+  }
   ```
 
 - **One public class per file** (helpers/private classes allowed sparingly).
 - **Avoid globals/singletons**; use DI cho dependencies.
-- **No wildcard imports**, no `print` trong prod code, no mutable default args.
-- **Type hints everywhere:** Functions, methods, class attributes, variables.
+- **No wildcard imports**, no debug statements trong prod code.
+- **Type annotations everywhere:** Functions, methods, class attributes, variables.
 
 #### Formatting & Style
 - Line length ≤ **100**; 4‑space indentation; trailing commas where appropriate.
@@ -1513,352 +1387,136 @@ app/
 ```
 
 #### 5.5.1 Global Constants Class
-```python
-# app/constants/global_constants.py
-from typing import Dict, List, Any, Union
-from dataclasses import dataclass
-from enum import Enum
-
-@dataclass(frozen=True)
-class GlobalConstants:
-    """Global constants class - Single source of truth for all constants"""
+```typescript
+// app/constants/GlobalConstants.ts
+// Language-agnostic constants example (adapt to your language)
+export class GlobalConstants {
+    // Global constants class - Single source of truth for all constants
     
-    # ===== BUSINESS CONSTANTS =====
-    # Order & Payment
-    MAX_ORDER_ITEMS: int = 50
-    MIN_ORDER_AMOUNT: float = 1000.0
-    MAX_DISCOUNT_PERCENTAGE: int = 30
-    DEFAULT_TAX_RATE: float = 0.1
+    // ===== BUSINESS CONSTANTS =====
+    // Order & Payment
+    MAX_ORDER_ITEMS = 50
+    MIN_ORDER_AMOUNT = 1000.0
+    MAX_DISCOUNT_PERCENTAGE = 30
+    DEFAULT_TAX_RATE = 0.1
     
-    # User & Authentication
-    MAX_USER_NAME_LENGTH: int = 100
-    MIN_PASSWORD_LENGTH: int = 8
-    MAX_PASSWORD_LENGTH: int = 128
-    SESSION_TIMEOUT_MINUTES: int = 30
+    // User & Authentication
+    MAX_USER_NAME_LENGTH = 100
+    MIN_PASSWORD_LENGTH = 8
+    MAX_PASSWORD_LENGTH = 128
+    SESSION_TIMEOUT_MINUTES = 30
     
-    # File & Upload
-    MAX_FILE_SIZE_MB: int = 10
-    ALLOWED_FILE_TYPES: List[str] = None
+    // File & Upload
+    MAX_FILE_SIZE_MB = 10
+    ALLOWED_FILE_TYPES = ["pdf", "jpg", "png"]
     
-    # ===== TECHNICAL CONSTANTS =====
-    # Database
-    DEFAULT_POOL_SIZE: int = 10
-    MAX_POOL_SIZE: int = 20
-    CONNECTION_TIMEOUT: int = 30
-    QUERY_TIMEOUT: int = 60
+    // ===== TECHNICAL CONSTANTS =====
+    // Database
+    DEFAULT_POOL_SIZE = 10
+    MAX_POOL_SIZE = 20
+    CONNECTION_TIMEOUT = 30
+    QUERY_TIMEOUT = 60
     
-    # Cache
-    DEFAULT_TTL: int = 3600
-    MAX_TTL: int = 86400
-    CACHE_PREFIX: str = 'app:'
+    // Cache
+    DEFAULT_TTL = 3600
+    MAX_TTL = 86400
+    CACHE_PREFIX = "app:"
     
-    # HTTP
-    DEFAULT_TIMEOUT: int = 30
-    MAX_RETRIES: int = 3
-    RETRY_DELAY: int = 1
+    // HTTP
+    DEFAULT_TIMEOUT = 30
+    MAX_RETRIES = 3
+    RETRY_DELAY = 1
     
-    # ===== API CONSTANTS =====
-    DEFAULT_PAGE_SIZE: int = 20
-    MAX_PAGE_SIZE: int = 100
-    SUPPORTED_VERSIONS: List[str] = None
-    CURRENT_VERSION: str = 'v1'
-    
-    # ===== VALIDATION CONSTANTS =====
-    EMAIL_MAX_LENGTH: int = 254
-    PHONE_MIN_LENGTH: int = 10
-    PHONE_MAX_LENGTH: int = 15
-    
-    # ===== FEATURE FLAGS =====
-    ENABLE_EMAIL_VERIFICATION: bool = True
-    ENABLE_SMS_NOTIFICATIONS: bool = False
-    ENABLE_TWO_FACTOR_AUTH: bool = True
-    ENABLE_ANALYTICS: bool = True
-    ENABLE_DEBUG_MODE: bool = False
-    
-    def __post_init__(self):
-        # Initialize mutable defaults
-        if self.ALLOWED_FILE_TYPES is None:
-            object.__setattr__(self, 'ALLOWED_FILE_TYPES', ['jpg', 'png', 'pdf', 'doc'])
-        if self.SUPPORTED_VERSIONS is None:
-            object.__setattr__(self, 'SUPPORTED_VERSIONS', ['v1', 'v2'])
-
-# Global instance
-GLOBAL_CONSTANTS = GlobalConstants()
-```
-
-#### 5.5.2 Business Constants
-```python
-# app/constants/business_constants.py
-from typing import Dict, List
-from dataclasses import dataclass
-
-@dataclass(frozen=True)
-class BusinessConstants:
-    """Business-specific constants"""
-    
-    # Order Statuses
-    ORDER_STATUSES = {
-        'PENDING': 'pending',
-        'CONFIRMED': 'confirmed', 
-        'SHIPPED': 'shipped',
-        'DELIVERED': 'delivered',
-        'CANCELLED': 'cancelled'
-    }
-    
-    ALL_ORDER_STATUSES = list(ORDER_STATUSES.values())
-    ACTIVE_ORDER_STATUSES = ['pending', 'confirmed', 'shipped']
-    FINAL_ORDER_STATUSES = ['delivered', 'cancelled']
-    
-    # Payment Methods
-    PAYMENT_METHODS = {
-        'cash': {'name': 'Tiền mặt', 'fee': 0, 'enabled': True},
-        'card': {'name': 'Thẻ', 'fee': 0.03, 'enabled': True},
-        'bank_transfer': {'name': 'Chuyển khoản', 'fee': 0.01, 'enabled': True}
-    }
-    
-    # Currency
-    SUPPORTED_CURRENCIES = ['VND', 'USD', 'EUR']
-    DEFAULT_CURRENCY = 'VND'
-    
-    # Business Rules
-    ORDER_STATUS_TRANSITIONS = {
-        'pending': ['confirmed', 'cancelled'],
-        'confirmed': ['shipped', 'cancelled'],
-        'shipped': ['delivered'],
-        'delivered': [],
-        'cancelled': []
-    }
-```
-
-#### 5.5.3 Technical Constants
-```python
-# app/constants/technical_constants.py
-from typing import Dict, List
-from dataclasses import dataclass
-
-@dataclass(frozen=True)
-class TechnicalConstants:
-    """Technical constants for system configuration"""
-    
-    # Database
-    SUPPORTED_DATABASES = ['postgresql', 'mysql', 'sqlite']
-    DEFAULT_DATABASE = 'postgresql'
-    
-    # Cache Keys
-    CACHE_KEYS = {
-        'user': 'user:{user_id}',
-        'session': 'session:{session_id}',
-        'product': 'product:{product_id}',
-        'order': 'order:{order_id}'
-    }
-    
-    # Logging
-    LOG_LEVELS = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
-    DEFAULT_LOG_LEVEL = 'INFO'
-    
-    # Rate Limiting
-    RATE_LIMITS = {
-        'default': {'requests': 100, 'window': 3600},
-        'premium': {'requests': 1000, 'window': 3600},
-        'admin': {'requests': 10000, 'window': 3600}
-    }
-```
-
-#### 5.5.4 UI Constants
-```python
-# app/constants/ui_constants.py
-from typing import Dict, List
-from dataclasses import dataclass
-
-@dataclass(frozen=True)
-class UiConstants:
-    """UI-specific constants"""
-    
-    # Display Formats
-    DATE_FORMAT = '%d/%m/%Y'
-    DATETIME_FORMAT = '%d/%m/%Y %H:%M:%S'
-    CURRENCY_FORMAT = '{:,.0f} VND'
-    
-    # Pagination
+    // ===== API CONSTANTS =====
     DEFAULT_PAGE_SIZE = 20
     MAX_PAGE_SIZE = 100
-    PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
+    SUPPORTED_VERSIONS = ["v1", "v2"]
+    CURRENT_VERSION = "v1"
     
-    # UI Messages (Non-I/O strings)
-    LOADING_MESSAGES = {
-        'default': 'Đang tải...',
-        'saving': 'Đang lưu...',
-        'deleting': 'Đang xóa...',
-        'processing': 'Đang xử lý...'
-    }
+    // ===== VALIDATION CONSTANTS =====
+    EMAIL_MAX_LENGTH = 254
+    PHONE_MIN_LENGTH = 10
+    PHONE_MAX_LENGTH = 15
     
-    SUCCESS_MESSAGES = {
-        'created': 'Tạo thành công',
-        'updated': 'Cập nhật thành công',
-        'deleted': 'Xóa thành công',
-        'saved': 'Lưu thành công'
-    }
-    
-    ERROR_MESSAGES = {
-        'general': 'Có lỗi xảy ra',
-        'network': 'Lỗi kết nối mạng',
-        'timeout': 'Hết thời gian chờ',
-        'unauthorized': 'Không có quyền truy cập'
-    }
+    // ===== FEATURE FLAGS =====
+    ENABLE_EMAIL_VERIFICATION = true
+    ENABLE_SMS_NOTIFICATIONS = false
+    ENABLE_TWO_FACTOR_AUTH = true
+    ENABLE_ANALYTICS = true
+    ENABLE_DEBUG_MODE = false
+}
+
+// Export singleton instance
+export const GLOBAL_CONSTANTS = new GlobalConstants();
 ```
 
-#### 5.5.5 Validation Constants
-```python
-# app/constants/validation_constants.py
-from typing import Dict, List
-from dataclasses import dataclass
-import re
+#### 5.5.2 Domain-Specific Constants Examples
 
-@dataclass(frozen=True)
-class ValidationConstants:
-    """Validation constants and patterns"""
-    
-    # Regex Patterns
-    EMAIL_PATTERN = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
-    PHONE_PATTERN = re.compile(r'^(\+84|84|0)[0-9]{9,10}$')
-    PASSWORD_PATTERN = re.compile(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d@$!%*?&]{8,}$')
-    
-    # Validation Rules
-    VALIDATION_RULES = {
-        'email': {
-            'max_length': 254,
-            'pattern': EMAIL_PATTERN,
-            'required': True
-        },
-        'phone': {
-            'min_length': 10,
-            'max_length': 15,
-            'pattern': PHONE_PATTERN,
-            'required': True
-        },
-        'password': {
-            'min_length': 8,
-            'max_length': 128,
-            'pattern': PASSWORD_PATTERN,
-            'required': True
-        }
-    }
-    
-    # Supported Languages
-    SUPPORTED_LANGUAGES = ['vi', 'en', 'ja', 'ko']
-    DEFAULT_LANGUAGE = 'vi'
+**Business Constants** (domain/constants/)
+- Order statuses, payment methods, currencies
+- Business rules and state transitions
+- Domain-specific validation rules
+
+**Technical Constants** (infrastructure/constants/)
+- Database configurations, cache keys
+- Logging levels, rate limits
+- Connection pools, timeouts
+
+**UI Constants** (interfaces/constants/)
+- Display formats (date, currency)
+- Pagination defaults
+- UI messages and labels
+
+> 💡 **Note**: Implement constants using your language's preferred pattern:
+> - TypeScript: `const` or `enum`
+> - Java: `static final` or `enum`
+> - C#: `const` or `static readonly`
+> - Rust: `const` or `static`
+
+#### 5.5.3 Constants Best Practices
+
+1. **Single Source of Truth**: Define each constant once
+2. **Type Safety**: Use language's type system
+3. **Immutability**: Prefer immutable/readonly constants
+4. **Naming**: UPPER_SNAKE_CASE for constants
+5. **Grouping**: Group related constants in classes/modules
+6. **Documentation**: Document purpose and usage
+7. **Environment Override**: Allow runtime override via ENV
+
+#### 5.5.4 Constants Loading Precedence
+
+```
+1. ENV variables (highest priority)
+2. Runtime config
+3. Constants files (default fallback)
 ```
 
-#### 5.5.6 Error Constants
-```python
-# app/constants/error_constants.py
-from typing import Dict, List
-from dataclasses import dataclass
+> ⚠️ Constants are **defaults only**. Always support override via configuration.
 
-@dataclass(frozen=True)
-class ErrorConstants:
-    """Error constants and codes"""
-    
-    # Error Codes
-    ERROR_CODES = {
-        'VALIDATION': {
-            'INVALID_EMAIL': 'VAL-001',
-            'REQUIRED_FIELD': 'VAL-002',
-            'INVALID_LENGTH': 'VAL-003',
-            'INVALID_FORMAT': 'VAL-004'
-        },
-        'BUSINESS': {
-            'USER_NOT_FOUND': 'BUS-001',
-            'INSUFFICIENT_BALANCE': 'BUS-002',
-            'DUPLICATE_ENTRY': 'BUS-003',
-            'INVALID_STATE': 'BUS-004'
-        },
-        'TECHNICAL': {
-            'DATABASE_ERROR': 'TEC-001',
-            'NETWORK_ERROR': 'TEC-002',
-            'TIMEOUT_ERROR': 'TEC-003',
-            'CONFIGURATION_ERROR': 'TEC-004'
-        }
-    }
-    
-    # Error Messages (Non-I/O strings)
-    ERROR_MESSAGES = {
-        'VALIDATION': {
-            'INVALID_EMAIL': 'Email không hợp lệ',
-            'REQUIRED_FIELD': 'Trường này là bắt buộc',
-            'INVALID_LENGTH': 'Độ dài không hợp lệ',
-            'INVALID_FORMAT': 'Định dạng không hợp lệ'
-        },
-        'BUSINESS': {
-            'USER_NOT_FOUND': 'Không tìm thấy người dùng',
-            'INSUFFICIENT_BALANCE': 'Số dư không đủ',
-            'DUPLICATE_ENTRY': 'Bản ghi đã tồn tại',
-            'INVALID_STATE': 'Trạng thái không hợp lệ'
-        },
-        'TECHNICAL': {
-            'DATABASE_ERROR': 'Lỗi cơ sở dữ liệu',
-            'NETWORK_ERROR': 'Lỗi kết nối mạng',
-            'TIMEOUT_ERROR': 'Hết thời gian chờ',
-            'CONFIGURATION_ERROR': 'Lỗi cấu hình'
-        }
-    }
-```
+---
 
-#### 5.5.7 Global Constants Usage
-```python
-# app/constants/__init__.py
-from .global_constants import GLOBAL_CONSTANTS
-from .business_constants import BusinessConstants
-from .technical_constants import TechnicalConstants
-from .ui_constants import UiConstants
-from .validation_constants import ValidationConstants
-from .error_constants import ErrorConstants
+### 5.6 Constants Import & Usage Rules
 
-# Export all constants
-__all__ = [
-    'GLOBAL_CONSTANTS',
-    'BusinessConstants', 
-    'TechnicalConstants',
-    'UiConstants',
-    'ValidationConstants',
-    'ErrorConstants'
-]
+**Import Patterns:**
+- Domain layer: Only domain constants
+- Application layer: Application + domain constants
+- Infrastructure layer: Infrastructure + application + domain constants
+- Interfaces layer: UI constants + application constants
 
-# Usage examples
-def validate_order_items(count: int) -> bool:
-    return count <= GLOBAL_CONSTANTS.MAX_ORDER_ITEMS
+**Best Practices:**
+- Single global instance per constants class
+- Immutable constants (readonly/const)
+- Type safety with full annotations
+- Centralized management in one location
+- Layer separation by responsibility
+- No hardcoding values in logic
+- Environment-aware values
 
-def get_supported_currencies() -> List[str]:
-    return BusinessConstants.SUPPORTED_CURRENCIES
-
-def validate_email(email: str) -> bool:
-    return ValidationConstants.EMAIL_PATTERN.match(email) is not None
-```
-
-#### 5.5.8 Constants Import Rules
-```python
-# Correct usage in different layers
-# Domain layer
-from app.constants import GLOBAL_CONSTANTS, BusinessConstants
-
-# Application layer  
-from app.constants import GLOBAL_CONSTANTS, ValidationConstants
-
-# Infrastructure layer
-from app.constants import GLOBAL_CONSTANTS, TechnicalConstants
-
-# Interfaces layer
-from app.constants import GLOBAL_CONSTANTS, UiConstants
-```
-
-#### 5.5.9 Constants Best Practices
-- **Single Global Instance**: Chỉ có một instance của GlobalConstants
-- **Immutable Constants**: Sử dụng `@dataclass(frozen=True)`
-- **Type Safety**: Type hints cho tất cả constants
-- **Centralized Management**: Tất cả constants ở một nơi
-- **Layer Separation**: Tách constants theo layer responsibility
-- **No Hardcoding**: Không hardcode values trong business logic
-- **Environment Awareness**: Hỗ trợ different values cho different environments
+**Example Use Cases:**
+- Regex patterns for validation (email, phone, password)
+- Error codes and messages
+- Business rules and state transitions
+- Feature flags and configuration
 
 ============================================================================
 ## 6) YÊU CẦU PHI CHỨC NĂNG
@@ -3968,29 +3626,35 @@ Khi AI tự động thêm thư viện vào dự án, phải cung cấp thông ti
   - Tên thay thế: `urllib3`, `httpx`
 
 #### 13.2.2 Cách Cài Đặt
-- **Nguồn cài đặt**: PyPI, conda, GitHub, local wheel
-- **Lệnh cài đặt**: `pip install`, `conda install`, `poetry add`
+- **Nguồn cài đặt**: Package registry (npm, Maven, NuGet, Cargo, etc.), GitHub, local build
+- **Lệnh cài đặt**: Package manager specific (`npm install`, `mvn dependency`, `dotnet add`, `cargo add`)
 - **Yêu cầu phần cứng**: RAM, CPU, disk space tối thiểu
 - **Yêu cầu hệ điều hành**: Windows, Linux, macOS compatibility
-- **Yêu cầu Python version**: Python 3.8+, 3.9+, 3.11+
+- **Yêu cầu language/runtime version**: Minimum version requirements
 - **Dependencies**: Các thư viện phụ thuộc khác
 - **Ví dụ**:
   ```bash
-  # Cài đặt cơ bản
-  pip install requests>=2.28.0
+  # TypeScript/JavaScript
+  npm install axios@^1.4.0
   
-  # Với dependencies
-  pip install requests[security]>=2.28.0
+  # Java/Maven
+  <dependency>
+      <groupId>com.squareup.okhttp3</groupId>
+      <artifactId>okhttp</artifactId>
+      <version>4.11.0</version>
+  </dependency>
+  
+  # C#/.NET
+  dotnet add package Flurl.Http --version 3.2.4
   
   # Yêu cầu hệ thống
   # RAM: 50MB, CPU: 1 core, Disk: 10MB
   # OS: Windows 10+, Linux, macOS 10.14+
-  # Python: 3.7+
   ```
 
 #### 13.2.3 Tại Sao Phù Hợp
 - **Mục đích sử dụng**: HTTP client, data processing, testing framework
-- **Tính năng chính**: Async support, type hints, performance
+- **Tính năng chính**: Async support, static typing support, performance
 - **Ưu điểm kỹ thuật**: Memory efficient, thread-safe, well-maintained
 - **Tương thích kiến trúc**: Phù hợp với Clean Architecture, DI pattern
 - **Ví dụ**:
@@ -4038,16 +3702,16 @@ Khi AI tự động thêm thư viện vào dự án, phải cung cấp thông ti
 - **License**: [license type]
 
 ### 2. Cài Đặt
-- **Nguồn**: [PyPI/conda/GitHub]
-- **Lệnh**: `pip install [package]>=[version]`
+- **Nguồn**: [Package registry/GitHub]
+- **Lệnh**: [Package manager install command]
 - **Yêu cầu phần cứng**: [RAM/CPU/Disk]
 - **Yêu cầu OS**: [Windows/Linux/macOS]
-- **Python version**: [3.x+]
+- **Language/Runtime version**: [Minimum version]
 - **Dependencies**: [list dependencies]
 
 ### 3. Lý Do Sử Dụng
 - **Mục đích**: [HTTP client, data processing, etc.]
-- **Tính năng**: [Async, type hints, performance]
+- **Tính năng**: [Async, static typing, performance]
 - **Ưu điểm kỹ thuật**: [Memory efficient, thread-safe]
 - **Tương thích kiến trúc**: [Clean Architecture, DI pattern]
 
@@ -4080,12 +3744,12 @@ Khi AI tự động thêm thư viện vào dự án, phải cung cấp thông ti
 - **License**: Apache 2.0
 
 ### 2. Cài Đặt
-- **Nguồn**: PyPI
-- **Lệnh**: `pip install requests>=2.31.0`
+- **Nguồn**: Package registry (npm, Maven, etc.)
+- **Lệnh**: Package manager specific
 - **Yêu cầu phần cứng**: RAM 50MB, CPU 1 core, Disk 10MB
 - **Yêu cầu OS**: Windows 10+, Linux, macOS 10.14+
-- **Python version**: 3.7+
-- **Dependencies**: urllib3, certifi, charset-normalizer
+- **Runtime version**: Language/framework minimum version
+- **Dependencies**: List of package dependencies
 
 ### 3. Lý Do Sử Dụng
 - **Mục đích**: HTTP client cho external API calls
@@ -4127,7 +3791,7 @@ Khi AI tự động thêm thư viện vào dự án, phải cung cấp thông ti
 
 #### 12.4.3 Validation
 - **Kiểm tra** thông tin chính xác
-- **Verify** compatibility với Python version
+- **Verify** compatibility với language/runtime version
 - **Check** license compatibility
 - **Validate** security status
 
