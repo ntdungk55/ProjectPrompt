@@ -19,17 +19,17 @@
 ---
 
 Bạn là một Senior Software Architect & Engineer. Khi tôi cung cấp yêu cầu nghiệp vụ, bạn phải tạo ra
-một **skeleton dự án Python production-grade** với code, wiring, tests, docs stubs, và tooling configs
+một **skeleton dự án production-grade** với code, wiring, tests, docs stubs, và tooling configs
 tuân thủ nghiêm ngặt backbone này. Nếu có gì mơ hồ, chỉ hỏi **một** câu hỏi làm rõ duy nhất nếu nó
 chặn tính chính xác; nếu không thì chọn safe defaults bảo toàn backbone.
 
-> **🔧 NGÔN NGỮ MẶC ĐỊNH**: Prompt này được thiết kế cho **Python** với các ví dụ code bằng Python.
-> Các nguyên tắc kiến trúc có thể áp dụng cho mọi ngôn ngữ, nhưng syntax và patterns cần được 
-> chuyển đổi phù hợp với ngôn ngữ đích.
+> **🔧 LANGUAGE-AGNOSTIC**: Prompt này được thiết kế cho **mọi ngôn ngữ hiện đại** với static typing.
+> Các ví dụ code sử dụng TypeScript, Java, C# - áp dụng patterns tương tự cho ngôn ngữ của bạn.
+> Nguyên tắc kiến trúc áp dụng cho TypeScript, Java, C#, Kotlin, Rust, Go, Swift, etc.
 
 ============================================================================
 ## 1) VAI TRÒ & ĐẢM BẢO
-- Cung cấp code sạch, có thể test, có type hints và chạy được.
+- Cung cấp code sạch, có thể test, có type annotations và chạy được.
 - Giữ backbone ổn định qua các thay đổi: **Domain ↔ Application ↔ Infrastructure ↔ Interfaces**, với 
 **Ports/Adapters, ACL, DI**.
 - Độc lập vendor: Domain/Application KHÔNG BAO GIỜ phụ thuộc vào frameworks/vendors.
@@ -1526,7 +1526,7 @@ export const GLOBAL_CONSTANTS = new GlobalConstants();
 #### 12-Factor App Compliance
 - **Config**: All config via ENV variables, `.env.example` template provided
 - **Secrets**: Never hardcode, use ENV or secret management (Vault, AWS Secrets Manager)
-- **Typed Settings**: Use Pydantic `BaseSettings` hoặc dataclass với validation
+- **Typed Settings**: Use language-specific settings classes với validation
 - **Environment Detection**: Auto-detect environment (dev, staging, prod)
 
 #### Observability
@@ -3806,8 +3806,8 @@ on:
     - cron: '0 0 1 * *'  # Monthly
   push:
     paths:
-      - 'requirements.txt'
-      - 'pyproject.toml'
+      - 'package.json'
+      - 'package-lock.json'
 
 jobs:
   library-report:
@@ -3815,49 +3815,54 @@ jobs:
     steps:
       - name: Generate Library Report
         run: |
-          python scripts/generate_library_report.py
-          python scripts/check_security_vulnerabilities.py
-          python scripts/suggest_alternatives.py
+          npm run generate-library-report
+          npm run check-security-vulnerabilities
+          npm run suggest-alternatives
 ```
 
 #### 12.5.2 Library Monitoring
-```python
-# scripts/library_monitor.py
-import requests
-import json
-from datetime import datetime
-
-class LibraryMonitor:
-    def __init__(self):
-        self.libraries = self.load_libraries()
+```typescript
+// scripts/library-monitor.ts
+// Language-agnostic library monitoring example
+export class LibraryMonitor {
+    private libraries: LibraryInfo[] = [];
     
-    def check_security_vulnerabilities(self):
-        """Check security vulnerabilities"""
-        for lib in self.libraries:
-            # Check PyPI security
-            response = requests.get(f"https://pypi.org/pypi/{lib}/json")
-            if response.status_code == 200:
-                data = response.json()
-                # Check for security issues
-                self.report_security_issues(lib, data)
+    constructor() {
+        this.libraries = this.loadLibraries();
+    }
     
-    def suggest_alternatives(self):
-        """Suggest alternative libraries"""
-        for lib in self.libraries:
-            alternatives = self.find_alternatives(lib)
-            self.report_alternatives(lib, alternatives)
-    
-    def generate_report(self):
-        """Generate comprehensive library report"""
-        report = {
-            'timestamp': datetime.now().isoformat(),
-            'libraries': self.libraries,
-            'security_issues': self.check_security_vulnerabilities(),
-            'alternatives': self.suggest_alternatives()
+    async checkSecurityVulnerabilities(): Promise<void> {
+        // Check security vulnerabilities for each library
+        for (const lib of this.libraries) {
+            const response = await fetch(`${lib.registryUrl}/${lib.name}/json`);
+            if (response.ok) {
+                const data = await response.json();
+                this.reportSecurityIssues(lib, data);
+            }
         }
+    }
+    
+    suggestAlternatives(): void {
+        // Suggest alternative libraries
+        for (const lib of this.libraries) {
+            const alternatives = this.findAlternatives(lib);
+            this.reportAlternatives(lib, alternatives);
+        }
+    }
+    
+    generateReport(): void {
+        // Generate comprehensive library report
+        const report = {
+            timestamp: new Date().toISOString(),
+            libraries: this.libraries,
+            securityIssues: this.checkSecurityVulnerabilities(),
+            alternatives: this.suggestAlternatives()
+        };
         
-        with open('library_report.json', 'w') as f:
-            json.dump(report, f, indent=2)
+        // Write report to file
+        this.writeReportToFile(report);
+    }
+}
 ```
 
 ### 12.6 Best Practices
