@@ -37,101 +37,328 @@ chặn tính chính xác; nếu không thì chọn safe defaults bảo toàn bac
 
 ============================================================================
 ## 2) NGUYÊN TẮC KIẾN TRÚC (BẤT BIẾN)
-- Clean Architecture / Hexagonal / DDD‑tactical separation.
-- SOLID (SRP, OCP, LSP, ISP, DIP).
-- Ports & Adapters: mọi external concern (HTTP/DB/Queue/Vendor) đều nằm sau **Ports (Protocols)** trong `application`.
-- Anti‑Corruption Layer (ACL): vendor mapping/schemas chỉ tồn tại trong `infrastructure/<provider>/acl` (mappers/translators).
-- Dependency Injection (DI): wire Ports→Adapters trong `di/container.py`. Không service locator trong Domain/Application.
-- Pure Domain: không I/O, không vendor types, logic deterministic.
-- 12‑Factor (config trong environment, stateless processes, disposability) cho runtime shape.
+
+### 2.1 Core Architectural Principles
+
+#### 2.1.1 Clean Architecture / Hexagonal / DDD Tactical Separation
+- **Domain** ở trung tâm: pure business logic, không phụ thuộc vào gì
+- **Application** orchestrates use cases, define ports (interfaces)
+- **Infrastructure** implements ports, integrates với external systems
+- **Interfaces** là entry points: REST, CLI, MCP, etc.
+
+#### 2.1.2 SOLID Principles
+- **SRP** (Single Responsibility): Mỗi class/module có 1 lý do duy nhất để thay đổi
+- **OCP** (Open/Closed): Mở cho mở rộng, đóng cho sửa đổi
+- **LSP** (Liskov Substitution): Subtypes thay thế được base types
+- **ISP** (Interface Segregation): Nhiều interfaces nhỏ > 1 interface lớn
+- **DIP** (Dependency Inversion): Depend on abstractions, not concretions
+
+#### 2.1.3 Dependency Rule (Bất Biến)
+```
+┌─────────────────────────────────────────────┐
+│            Interfaces (UI/API/CLI)          │ ← Entry points
+├─────────────────────────────────────────────┤
+│          Infrastructure (Adapters)          │ ← External integrations
+├─────────────────────────────────────────────┤
+│        Application (Use Cases, Ports)       │ ← Orchestration
+├─────────────────────────────────────────────┤
+│      Domain (Entities, VOs, Services)       │ ← Core business logic
+└─────────────────────────────────────────────┘
+
+DEPENDENCY FLOW: ──────────────────────────────►
+                 (Từ ngoài vào trong)
+
+❌ Domain KHÔNG BAO GIỜ depend vào Application/Infrastructure/Interfaces
+❌ Application KHÔNG BAO GIỜ depend vào Infrastructure/Interfaces
+✅ Infrastructure/Interfaces depend vào Application/Domain (via ports)
+```
+
+### 2.2 Key Patterns
+
+#### Ports & Adapters
+- **Ports (Protocols)**: Defined trong `application/ports/` - abstract interfaces
+- **Adapters**: Implemented trong `infrastructure/` - concrete implementations
+- Mọi external concern (HTTP/DB/Queue/Vendor) nằm **sau Ports**
+
+#### Anti-Corruption Layer (ACL)
+- Vendor mapping/schemas chỉ tồn tại trong `infrastructure/<provider>/acl/`
+- Mappers/translators chuyển đổi giữa domain models ↔ vendor schemas
+- **Không bao giờ** leak vendor types ra ngoài infrastructure layer
+
+#### Dependency Injection (DI)
+- Wire Ports → Adapters trong `di/container.py`
+- **KHÔNG** service locator trong Domain/Application
+- Constructor injection, không property injection
+
+#### Pure Domain
+- **Không I/O**: Domain không gọi database, HTTP, file system
+- **Không vendor types**: Không import từ external libraries
+- **Logic deterministic**: Pure functions, predictable outputs
+
+#### 12-Factor App
+- **Config**: Environment variables, không hardcode
+- **Stateless processes**: Không session state trên server
+- **Disposability**: Fast startup/shutdown, graceful termination
+
+### 2.3 Common Violations to Avoid
+
+| ❌ Violation | ✅ Correct Approach |
+|-------------|---------------------|
+| Import requests trong Domain | Define port trong Application, implement trong Infrastructure |
+| Entity có method `save()` | Repository pattern với port interface |
+| Use case import DB driver | Use case depend vào Repository port |
+| Domain import DTO từ vendor | ACL mapper chuyển vendor DTO → Domain entity |
+| Hardcode URL trong Use Case | URL trong Infrastructure constants, inject via config |
+| Service locator trong Domain | Constructor injection via DI container |
+| Mutable DTOs cross boundaries | `@dataclass(frozen=True)` cho tất cả DTOs |
+| Domain entity với JSON serialization | Mapper layer chuyển Entity → DTO → JSON |
+
+### 2.4 Why These Principles?
+
+- **Testability**: Domain/Application test dễ dàng không cần I/O
+- **Vendor Independence**: Đổi database/API provider không ảnh hưởng domain
+- **Maintainability**: Thay đổi UI không ảnh hưởng business logic
+- **Scalability**: Dễ dàng thêm interfaces mới (REST, CLI, GraphQL, MCP)
+- **Team Productivity**: Teams làm việc độc lập trên các layers khác nhau
 
 ============================================================================
 ## 3) CẤU TRÚC DỰ ÁN (KHÔNG ĐƯỢC THAY ĐỔI MÀ KHÔNG CÓ PHÉP)
 
-### 3.1 Cấu Trúc Core Application
+### 3.1 Layer Responsibilities
+
+| Layer | Responsibility | Can Import From | Cannot Import From |
+|-------|----------------|-----------------|-------------------|
+| **Domain** | Pure business logic, entities, value objects | Nothing (self-contained) | Application, Infrastructure, Interfaces |
+| **Application** | Use cases, DTOs, port definitions | Domain only | Infrastructure, Interfaces |
+| **Infrastructure** | External integrations, adapters, DB, HTTP | Application, Domain | Interfaces |
+| **Interfaces** | Entry points: REST, CLI, MCP | Application, Domain, Infrastructure | Nothing (top layer) |
+| **DI** | Wire dependencies, container setup | All layers | Nothing (orchestration only) |
+
+### 3.2 Cấu Trúc Core Application
 ```
 app/
-  domain/
-    enums/
-    value_objects/
-    entities/
-    services/             # chỉ pure domain logic
-    constants/            # domain-wide defaults: pure business defaults (KHÔNG URL, KHÔNG vendor)
-    errors.py
-  application/
-    ports/                # Protocols: repositories, providers, gateways, policies
-    dto/                  # Command / Query / Result DTOs
-    use_cases/
-    constants/            # app-level defaults: paging, retry policy defaults, UI schema defaults (vendor-agnostic)
-    errors.py
-  infrastructure/
-    http/
-      http_method.py
-      request_entity.py
-      client.py
-      middlewares/        # retry, circuit‑breaker, auth, logging
-    <provider_name>/      # ví dụ: tomtom/, google/, payment/, etc.
-      acl/                # mappers / translators
-      request_entities/
-      adapters/           # implement application.ports.*
-      constants/          # default URLs/paths/version cho provider (tách khỏi endpoint.py)
-      endpoint.py
-      errors.py
-    persistence/          # repository implementations + migrations (nếu có)
-    config/               # settings/env loaders, typed config
-    logging/              # logger wrappers
-    cache/
-    constants/            # infra defaults không gắn với provider cụ thể (ví dụ: timeout, default headers)
-    observability/        # OpenTelemetry hooks (optional)
-  interfaces/
-    mcp/                  # tool/server handlers
-    rest/                 # FastAPI/Flask entry (optional)
-    cli/                  # Typer/Click (optional)
-    constants/            # UI-facing defaults (nếu có REST/CLI/MCP), ví dụ: display page_size
-  di/
-    container.py              # Main DI container
-    providers/                # DI providers cho từng module
-      domain_provider.py      # Domain layer dependencies
-      application_provider.py # Application layer dependencies
-      infrastructure_provider.py # Infrastructure dependencies
-      interfaces_provider.py  # Interfaces dependencies
-    scopes/                   # DI scopes management
-      singleton_scope.py      # Singleton scope
-      transient_scope.py      # Transient scope
-      scoped_scope.py        # Scoped scope
-    factories/                # Factory patterns
-      repository_factory.py  # Repository factories
-      service_factory.py     # Service factories
-      gateway_factory.py     # Gateway factories
-    decorators/               # DI decorators
-      injectable.py          # Injectable decorator
-      singleton.py           # Singleton decorator
-      scoped.py              # Scoped decorator
-    exceptions/               # DI exceptions
-      di_exceptions.py       # DI-specific exceptions
-    utils/                    # DI utilities
-      type_checker.py        # Type checking utilities
-      instance_manager.py     # Instance lifecycle management
+  domain/                           # 🎯 CORE BUSINESS LOGIC (Layer 1 - Innermost)
+    enums/                          # Business enums (OrderStatus, UserRole)
+    value_objects/                  # Immutable values (Money, Email, Coordinates)
+    entities/                       # Business entities (User, Order, Product)
+    services/                       # Pure domain logic services (no I/O)
+    constants/                      # Business constants (KHÔNG URL, KHÔNG vendor)
+    errors.py                       # Domain exceptions
+
+  application/                      # 🔧 USE CASES & ORCHESTRATION (Layer 2)
+    ports/                          # 📡 Protocols/Interfaces: repositories, gateways, services
+    dto/                            # Data Transfer Objects: Command, Query, Response DTOs
+    use_cases/                      # Business use cases (CreateUser, ProcessOrder)
+    constants/                      # App defaults: paging, retry, UI schema (vendor-agnostic)
+    errors.py                       # Application exceptions
+
+  infrastructure/                   # 🔌 EXTERNAL INTEGRATIONS (Layer 3)
+    http/                           # HTTP client foundation
+      http_method.py                # HTTP method enum
+      request_entity.py             # Generic HTTP request entity
+      client.py                     # Base HTTP client
+      middlewares/                  # retry, circuit-breaker, auth, logging
+    
+    <provider_name>/                # 🌐 Provider-specific (e.g., tomtom/, stripe/, google/)
+      acl/                          # 🛡️ Anti-Corruption Layer: mappers/translators
+      dto/                          # Provider-specific request/response DTOs
+      adapters/                     # Implement application.ports.* interfaces
+      constants/                    # Provider URLs/paths/versions (KHÔNG trong endpoint.py)
+      endpoint.py                   # Provider endpoint configurations
+      errors.py                     # Provider-specific errors
+    
+    persistence/                    # Database repository implementations + migrations
+    config/                         # Settings/env loaders, typed config classes
+    logging/                        # Logger wrappers (structured logging)
+    cache/                          # Cache implementations (Redis, Memcached)
+    constants/                      # Infra defaults (timeouts, headers) - NOT provider-specific
+    observability/                  # OpenTelemetry, tracing, metrics (optional)
+
+  interfaces/                       # 🚪 ENTRY POINTS (Layer 4 - Outermost)
+    mcp/                            # MCP tool/server handlers
+    rest/                           # REST API (FastAPI, Flask) - optional
+    cli/                            # CLI commands (Typer, Click) - optional
+    graphql/                        # GraphQL API - optional
+    constants/                      # UI-facing defaults (display formats, page sizes)
+
+  di/                               # 🏗️ DEPENDENCY INJECTION
+    container.py                    # Main DI container & registration
+    providers.py                    # Provider registration functions (optional split)
 ```
 
-### 3.2 Cấu Trúc Hỗ Trợ
+### 3.3 Cấu Trúc Hỗ Trợ
 ```
-tests/
-  domain/                 # unit (không I/O)
-  application/            # use cases với mocked ports
-  infrastructure/         # adapter/contract/integration
-  interfaces/             # e2e/lightweight integration
-docs/
-  adr/                    # Architecture Decision Records
-  README.md
-  CHANGELOG.md
-  CONTRIBUTING.md
+tests/                              # 🧪 TESTING
+  domain/                           # Unit tests (no I/O, pure logic)
+  application/                      # Use case tests (mocked ports)
+  infrastructure/                   # Adapter/integration tests
+  interfaces/                       # E2E/API tests
+  fixtures/                         # Shared test fixtures
+  conftest.py                       # Pytest configuration
+
+docs/                               # 📚 DOCUMENTATION
+  adr/                              # Architecture Decision Records
+  api/                              # API documentation (OpenAPI/Swagger)
+  architecture/                     # Architecture diagrams
+  README.md                         # Project overview
+  CHANGELOG.md                      # Version history
+  CONTRIBUTING.md                   # Contribution guidelines
+
+scripts/                            # 🛠️ UTILITY SCRIPTS
+  setup.py                          # Environment setup
+  migrate.py                        # Database migrations
+  seed.py                           # Data seeding
+
+.github/                            # ⚙️ CI/CD
+  workflows/                        # GitHub Actions workflows
+    test.yml                        # Test pipeline
+    lint.yml                        # Linting
+    deploy.yml                      # Deployment
+```
+
+### 3.4 Quy Tắc Cấu Trúc (Bắt Buộc)
+
+#### 3.4.1 File Organization
+- **One public class per file** (private helpers allowed)
+- **File name = class name** (snake_case)
+- **Module structure mirrors responsibility**
+
+#### 3.4.2 Import Rules
+```python
+# ✅ ALLOWED
+# Domain: no imports from other layers
+# Application: 
+from app.domain.entities.user import User
+from app.application.ports.user_repository import UserRepository
+
+# Infrastructure:
+from app.application.ports.user_repository import UserRepository
+from app.domain.entities.user import User
+
+# Interfaces:
+from app.application.use_cases.create_user import CreateUser
+from app.application.dto.create_user_command_dto import CreateUserCommandDto
+
+# ❌ FORBIDDEN
+# Domain importing from application/infrastructure
+from app.infrastructure.database import db  # ❌ NEVER
+
+# Application importing from infrastructure
+from app.infrastructure.stripe.client import StripeClient  # ❌ NEVER
+```
+
+#### 3.4.3 Constants Placement
+```
+Domain constants     → app/domain/constants/     (business values)
+Application constants → app/application/constants/ (use case configs)
+Infrastructure constants → app/infrastructure/constants/ (tech configs)
+Provider constants   → app/infrastructure/<provider>/constants/ (URLs, keys)
+Interface constants  → app/interfaces/constants/ (UI defaults)
 ```
 
 ============================================================================
 ## 4) TIÊU CHUẨN CODE & QUY ƯỚC (CÓ THỂ THỰC THI)
 
-### 4.1 Quy Tắc Đặt Tên Data Model (bắt buộc)
+### 4.1 🎯 Quick Reference - Naming Conventions (Tra Cứu Nhanh)
+
+**Sử dụng bảng này khi cần tra cứu nhanh cách đặt tên. Chi tiết đầy đủ ở sections sau.**
+
+#### DOMAIN LAYER
+```
+{Entity}                          → User, Order, Product
+{Entity}Id                        → UserId, OrderId, ProductId
+{Entity}Name                      → ProductName, CategoryName
+{Entity}Status                    → OrderStatus, UserStatus, PaymentStatus
+{Entity}Event                     → UserCreatedEvent, OrderPlacedEvent
+{ValueObject}                     → Money, Email, Coordinates, Price
+```
+
+#### APPLICATION LAYER
+```
+{Entity}Repository                → UserRepository, OrderRepository
+{Entity}Gateway                   → PaymentGateway, NotificationGateway
+{Action}{Entity}                  → CreateUser, UpdateOrder, GetProduct (Use Cases)
+
+{Action}{Entity}CommandDto        → CreateUserCommandDto, UpdateOrderCommandDto
+{Action}{Entity}QueryDto          → GetUserQueryDto, SearchOrdersQueryDto
+{Action}{Entity}ResponseDto       → CreateUserResponseDto, UserResponseDto
+{Entity}ResponseDto               → UserResponseDto, OrderResponseDto
+{Entity}ResultDto                 → ValidationResultDto, ProcessingResultDto
+{Entity}EventDto                  → UserCreatedEventDto, OrderPlacedEventDto
+{Entity}ListResponseDto           → UserListResponseDto, OrderListResponseDto
+Paged{Entity}sResponseDto         → PagedUsersResponseDto, PagedOrdersResponseDto
+```
+
+#### INFRASTRUCTURE LAYER
+```
+{Provider}{Entity}RequestDto      → StripePaymentRequestDto, GoogleMapsRouteRequestDto
+{Provider}{Entity}ResponseDto     → StripePaymentResponseDto, Auth0UserResponseDto
+{Provider}{Entity}Mapper          → StripePaymentMapper, GoogleMapsRouteMapper
+{Entity}Entity                    → UserEntity, OrderEntity (Database models)
+{Entity1}{Entity2}LinkEntity      → UserOrderLinkEntity, ProductCategoryLinkEntity
+{Entity}{Tech}Repository          → UserSqlRepository, OrderPostgresRepository
+```
+
+#### INTERFACES LAYER (UI) - NO "Dto" suffix
+```
+{Entity}UiModel                   → UserUiModel, OrderUiModel, DashboardUiModel
+{Feature}UiState                  → UserProfileUiState, OrderListUiState
+{Feature}UiEvent                  → UserClickedSubmitEvent, OrderFilterChangedEvent
+{Feature}UiEffect                 → ShowNotificationEffect, NavigateToPageEffect
+{Feature}Form                     → LoginForm, CreateOrderForm, UserProfileForm
+```
+
+#### MAPPERS
+```
+{Entity}Mapper                    → UserMapper, OrderMapper
+{Provider}{Entity}Mapper          → StripePaymentMapper, GoogleMapsRouteMapper
+to_domain()                       → Converts DTO → Domain Entity
+to_dto()                          → Converts Domain Entity → DTO
+to_entity()                       → Converts Domain → DB Entity
+to_ui_model()                     → Converts DTO → UI Model
+to_command()                      → Converts Input → Command DTO
+to_query()                        → Converts Input → Query DTO
+```
+
+#### FIELD NAMING
+```
+is_*, has_*, can_*, should_*      → Boolean fields
+*_at                              → Timestamp fields (ISO-8601)
+*_date                            → Date-only fields
+*_id                              → ID fields
+*_count, num_*, total_*           → Count/quantity fields
+*_status, *_state                 → Status/state fields
+*_url, *_uri                      → URL/URI fields
+*_amount                          → Money/currency fields
+```
+
+#### VERSIONING
+```
+{Entity}ResponseV2Dto             → Versioned response (V2)
+CreateUserCommandV1Dto            → Versioned command (V1)
+```
+
+#### ⚠️ CRITICAL RULES (BẮT BUỘC)
+```
+✅ ALWAYS frozen=True              → All DTOs, VOs, UI Models
+✅ ALWAYS docstring                → Every DTO/UI Model must explain Purpose/Used by/Reason
+✅ ALWAYS type hints               → Full type annotations
+✅ ALWAYS tuple not list           → Collections in frozen dataclasses
+✅ ALWAYS separate layers          → No Entity as Dto, no cross-layer reuse
+✅ ALWAYS ISO-8601                 → Datetime at all boundaries
+✅ UI Models NO "Dto" suffix       → UserUiModel (NOT UserUiModelDto)
+
+❌ NEVER Entity as Dto             → Separate types always
+❌ NEVER mutable collections       → Use tuple, frozenset
+❌ NEVER skip frozen=True          → For DTOs/VOs/UI Models
+❌ NEVER skip docstring            → Explain every DTO/UI Model
+❌ NEVER vendor types in Domain    → Keep domain pure
+❌ NEVER "Dto" suffix for UI       → UI Models are view models, not DTOs
+```
+
+---
+
+### 4.2 Quy Tắc Đặt Tên Data Model - Chi Tiết (Detailed Rules)
 
 #### Domain Layer
 - **Domain entities (nghiệp vụ thuần):** đặt tên **danh từ số ít, CapWords**, không thêm hậu tố *Model*.
@@ -645,102 +872,9 @@ docs/
    - Include: `items`, `page`, `page_size`, `total`, `has_next`
    - Items PHẢI là `tuple` not `list`
 
-#### Tóm Tắt Quy Tắc Đặt Tên (Quick Reference)
+---
 
-**DOMAIN LAYER:**
-```
-{Entity}                          → User, Order, Product
-{Entity}Id                        → UserId, OrderId, ProductId
-{Entity}Name                      → ProductName, CategoryName
-{Entity}Status                    → OrderStatus, UserStatus, PaymentStatus
-{Entity}Event                     → UserCreatedEvent, OrderPlacedEvent
-{ValueObject}                     → Money, Email, Coordinates, Price
-```
-
-**APPLICATION LAYER:**
-```
-{Entity}Repository                → UserRepository, OrderRepository
-{Entity}Gateway                   → PaymentGateway, NotificationGateway
-{Action}{Entity}                  → CreateUser, UpdateOrder, GetProduct (Use Cases)
-
-{Action}{Entity}CommandDto        → CreateUserCommandDto, UpdateOrderCommandDto
-{Action}{Entity}QueryDto          → GetUserQueryDto, SearchOrdersQueryDto
-{Action}{Entity}ResponseDto       → CreateUserResponseDto, UserResponseDto
-{Entity}ResponseDto               → UserResponseDto, OrderResponseDto
-{Entity}ResultDto                 → ValidationResultDto, ProcessingResultDto
-{Entity}EventDto                  → UserCreatedEventDto, OrderPlacedEventDto
-{Entity}ListResponseDto           → UserListResponseDto, OrderListResponseDto
-Paged{Entity}sResponseDto         → PagedUsersResponseDto, PagedOrdersResponseDto
-```
-
-**INFRASTRUCTURE LAYER:**
-```
-{Provider}{Entity}RequestDto      → StripePaymentRequestDto, GoogleMapsRouteRequestDto
-{Provider}{Entity}ResponseDto     → StripePaymentResponseDto, Auth0UserResponseDto
-{Provider}{Entity}Mapper          → StripePaymentMapper, GoogleMapsRouteMapper
-{Entity}Entity                    → UserEntity, OrderEntity (Database models)
-{Entity1}{Entity2}LinkEntity      → UserOrderLinkEntity, ProductCategoryLinkEntity
-{Entity}{Tech}Repository          → UserSqlRepository, OrderPostgresRepository
-```
-
-**INTERFACES LAYER (UI) - NO "Dto" suffix:**
-```
-{Entity}UiModel                   → UserUiModel, OrderUiModel, DashboardUiModel
-{Feature}UiState                  → UserProfileUiState, OrderListUiState
-{Feature}UiEvent                  → UserClickedSubmitEvent, OrderFilterChangedEvent
-{Feature}UiEffect                 → ShowNotificationEffect, NavigateToPageEffect
-{Feature}Form                     → LoginForm, CreateOrderForm, UserProfileForm
-```
-
-**MAPPERS:**
-```
-{Entity}Mapper                    → UserMapper, OrderMapper
-{Provider}{Entity}Mapper          → StripePaymentMapper, GoogleMapsRouteMapper
-to_domain()                       → Converts DTO → Domain Entity
-to_dto()                          → Converts Domain Entity → DTO
-to_entity()                       → Converts Domain → DB Entity
-to_ui_model()                     → Converts DTO → UI Model
-to_command()                      → Converts Input → Command DTO
-to_query()                        → Converts Input → Query DTO
-```
-
-**FIELD NAMING:**
-```
-is_*, has_*, can_*, should_*      → Boolean fields
-*_at                              → Timestamp fields (ISO-8601)
-*_date                            → Date-only fields
-*_id                              → ID fields
-*_count, num_*, total_*           → Count/quantity fields
-*_status, *_state                 → Status/state fields
-*_url, *_uri                      → URL/URI fields
-*_amount                          → Money/currency fields
-```
-
-**VERSIONING:**
-```
-{Entity}ResponseV2Dto             → Versioned response (V2)
-CreateUserCommandV1Dto            → Versioned command (V1)
-```
-
-**CRITICAL RULES:**
-```
-✅ ALWAYS frozen=True              → All DTOs, VOs, UI Models
-✅ ALWAYS docstring                → Every DTO/UI Model must explain Purpose/Used by/Reason
-✅ ALWAYS type hints               → Full type annotations
-✅ ALWAYS tuple not list           → Collections in frozen dataclasses
-✅ ALWAYS separate layers          → No Entity as Dto, no cross-layer reuse
-✅ ALWAYS ISO-8601                 → Datetime at all boundaries
-✅ UI Models NO "Dto" suffix       → UserUiModel (NOT UserUiModelDto)
-
-❌ NEVER Entity as Dto             → Separate types always
-❌ NEVER mutable collections       → Use tuple, frozenset
-❌ NEVER skip frozen=True          → For DTOs/VOs/UI Models
-❌ NEVER skip docstring            → Explain every DTO/UI Model
-❌ NEVER vendor types in Domain    → Keep domain pure
-❌ NEVER "Dto" suffix for UI       → UI Models are view models, not DTOs
-```
-
-#### Ví Dụ Hoàn Chỉnh: DTO Documentation Best Practices
+### 4.3 Ví Dụ Thực Tế (Essential Examples Only)
 
 **Example 1: Command DTO với đầy đủ documentation**
 ```python
@@ -795,173 +929,7 @@ class CreateUserCommandDto:
             raise ValueError("Password must be at least 8 characters")
 ```
 
-**Example 2: Query DTO với pagination**
-```python
-# File: app/application/dto/search_orders_query_dto.py
-from dataclasses import dataclass
-
-@dataclass(frozen=True)
-class SearchOrdersQueryDto:
-    """
-    Query DTO for searching and filtering orders.
-    
-    Purpose:
-        Provides type-safe query parameters for order search operations.
-        Supports filtering by multiple criteria with pagination.
-        
-    Used by:
-        - SearchOrders use case (application/use_cases/search_orders.py)
-        - Order list API endpoint (interfaces/api/v1/orders.py)
-        - Admin dashboard order search (interfaces/admin/orders.py)
-        
-    Reason:
-        Centralizes query parameter validation and prevents SQL injection.
-        Decouples API query parameters from repository implementation.
-        Enables consistent pagination across all search endpoints.
-        
-    Fields:
-        customer_id: Optional filter by customer ID
-        status: Optional filter by order status
-        from_date: Start date in ISO-8601 format (inclusive)
-        to_date: End date in ISO-8601 format (inclusive)
-        page: Page number (1-indexed)
-        page_size: Number of items per page (max 100)
-    """
-    customer_id: str | None = None
-    status: str | None = None
-    from_date: str | None = None  # ISO-8601
-    to_date: str | None = None    # ISO-8601
-    page: int = 1
-    page_size: int = 20
-    
-    def __post_init__(self) -> None:
-        """Validate pagination parameters."""
-        if self.page < 1:
-            raise ValueError("Page must be >= 1")
-        if self.page_size < 1 or self.page_size > 100:
-            raise ValueError("Page size must be between 1 and 100")
-```
-
-**Example 3: Response DTO với nested data**
-```python
-# File: app/application/dto/order_response_dto.py
-from dataclasses import dataclass
-from decimal import Decimal
-
-@dataclass(frozen=True)
-class OrderItemResponseDto:
-    """
-    Nested DTO for order items.
-    
-    Purpose: Represents a single item within an order response.
-    Used by: OrderResponseDto as part of order details.
-    Reason: Separates item data from order data for clarity.
-    """
-    product_id: str
-    product_name: str
-    quantity: int
-    unit_price: Decimal
-    total_price: Decimal
-
-@dataclass(frozen=True)
-class OrderResponseDto:
-    """
-    Response DTO for order data.
-    
-    Purpose:
-        Returns complete order information to presentation layer.
-        Includes calculated totals and formatted customer data.
-        
-    Used by:
-        - GetOrder use case (application/use_cases/get_order.py)
-        - CreateOrder use case (application/use_cases/create_order.py)
-        - Order detail API endpoint (interfaces/api/v1/orders/{id}.py)
-        
-    Reason:
-        Prevents exposure of internal order entity structure.
-        Controls exactly what data is sent to clients.
-        Pre-calculates totals to avoid client-side computation.
-        Formats data for optimal API consumption.
-        
-    Example:
-        >>> order_dto = OrderResponseDto(
-        ...     order_id="ord_123",
-        ...     customer_id="cust_456",
-        ...     customer_name="John Doe",
-        ...     items=(
-        ...         OrderItemResponseDto("prod_1", "Widget", 2, Decimal("10.00"), Decimal("20.00")),
-        ...     ),
-        ...     subtotal=Decimal("20.00"),
-        ...     tax=Decimal("2.00"),
-        ...     total=Decimal("22.00"),
-        ...     status="pending",
-        ...     created_at="2024-01-15T10:30:00Z"
-        ... )
-    """
-    order_id: str
-    customer_id: str
-    customer_name: str
-    items: tuple[OrderItemResponseDto, ...]  # Use tuple for immutability
-    subtotal: Decimal
-    tax: Decimal
-    total: Decimal
-    status: str
-    created_at: str  # ISO-8601
-    updated_at: str  # ISO-8601
-    notes: str | None = None
-```
-
-**Example 4: UI Model với pre-formatted data (NO "Dto" suffix)**
-```python
-# File: app/interfaces/models/user_ui_model.py
-from dataclasses import dataclass
-
-@dataclass(frozen=True)
-class UserUiModel:
-    """
-    UI model for user display in web interface.
-    
-    Purpose:
-        Optimized user data format specifically for UI rendering.
-        Includes pre-formatted strings and UI-specific fields.
-        
-    Used by:
-        - User profile view template (interfaces/web/templates/user_profile.html)
-        - User list component (interfaces/web/components/user_list.tsx)
-        - Admin user management panel (interfaces/admin/users.py)
-        
-    Reason:
-        Separates presentation concerns from business data.
-        Pre-formats complex data (dates, status badges) on backend.
-        Reduces frontend logic and ensures consistent formatting.
-        Includes only UI-relevant fields, omits sensitive data.
-        
-    Note:
-        UI models are VIEW MODELS, not DTOs. They don't use "Dto" suffix.
-        
-    Fields:
-        user_id: Unique identifier for links/actions
-        display_name: Full name formatted for display
-        email: User email (may be masked for privacy)
-        avatar_url: Full URL to user avatar image
-        role_label: Human-readable role ("Administrator", "Customer")
-        status_badge: Formatted status ("Active", "Inactive", "Suspended")
-        member_since: Formatted date ("Member since January 2024")
-        last_login: Formatted relative time ("Last login 2 hours ago")
-        is_online: Current online status
-    """
-    user_id: str
-    display_name: str
-    email: str
-    avatar_url: str
-    role_label: str
-    status_badge: str
-    member_since: str
-    last_login: str
-    is_online: bool
-```
-
-**Example 5: Provider-specific DTO trong Infrastructure**
+**Example 2: Provider-specific DTO (Anti-Corruption Layer)**
 ```python
 # File: app/infrastructure/stripe/dto/stripe_payment_request_dto.py
 from dataclasses import dataclass
@@ -1011,53 +979,12 @@ class StripePaymentRequestDto:
             raise ValueError("Description max length is 1000 chars")
 ```
 
-**Example 6: Event DTO cho messaging**
-```python
-# File: app/application/dto/user_created_event_dto.py
-from dataclasses import dataclass
-from typing import Any
+> 💡 **Lưu ý**: Tham khảo thêm các ví dụ khác (Query DTO, Response DTO, UI Model, Event DTO) 
+> trong documentation hoặc examples repository khi cần.
 
-@dataclass(frozen=True)
-class UserCreatedEventDto:
-    """
-    Event DTO for user creation domain event.
-    
-    Purpose:
-        Serializable representation of UserCreated domain event.
-        Used for publishing to message queue and event sourcing.
-        
-    Used by:
-        - Event bus publisher (infrastructure/messaging/event_publisher.py)
-        - Event store persistence (infrastructure/event_store/repository.py)
-        - External event consumers (downstream microservices)
-        
-    Reason:
-        Decouples domain events from message broker schema.
-        Provides stable event schema for external consumers.
-        Enables event versioning without breaking domain model.
-        Ensures events are immutable and serializable.
-        
-    Event Schema Version: 1.0
-    
-    Fields:
-        event_id: Unique identifier for this event instance
-        aggregate_id: ID of the user (aggregate root)
-        occurred_at: When the event occurred (ISO-8601)
-        event_type: Type discriminator ("UserCreated")
-        version: Event schema version for compatibility
-        user_data: User details at time of creation
-        metadata: Additional context (correlation_id, causation_id, etc.)
-    """
-    event_id: str
-    aggregate_id: str  # user_id
-    occurred_at: str   # ISO-8601
-    event_type: str = "UserCreated"
-    version: str = "1.0"
-    user_data: dict[str, Any] | None = None
-    metadata: dict[str, str] | None = None
-```
+---
 
-### 4.2 Tiêu Chuẩn Code Chung
+### 4.4 Tiêu Chuẩn Code Chung
 
 #### Language & Type Safety
 - **Python 3.11+** với full type hints cho tất cả code.
@@ -1937,20 +1864,146 @@ from app.constants import GLOBAL_CONSTANTS, UiConstants
 ## 6) YÊU CẦU PHI CHỨC NĂNG
 
 ### 6.1 Configuration & Environment
-- Config & secrets: **12‑Factor**, env‑driven; include `.env.example`, typed settings objects.
-- Observability: structured logs; optional **OpenTelemetry** (traces/metrics/logs).
-- Resilience: async I/O; timeouts; retry+backoff; optional circuit breaker; idempotency cho writes.
-- API/versioning: nếu REST, include OpenAPI; **SemVer** cho public DTOs với backward‑compat window.
-- Security posture: khi relevant, map features to **OWASP ASVS** controls (V1–V14).
 
-### 6.2 Persistence (NẾU ĐƯỢC YÊU CẦU)
-- Application định nghĩa **Repository Ports**. Infrastructure implement repositories.
-- Provide schema/migration scaffolding cho SQL; add key indexes cho queries.
-- Isolation: no DB drivers imported trong Domain/Application.
+#### 12-Factor App Compliance
+- **Config**: All config via ENV variables, `.env.example` template provided
+- **Secrets**: Never hardcode, use ENV or secret management (Vault, AWS Secrets Manager)
+- **Typed Settings**: Use Pydantic `BaseSettings` hoặc dataclass với validation
+- **Environment Detection**: Auto-detect environment (dev, staging, prod)
 
-### 6.3 HTTP & External Providers
-- `infrastructure/http/client.py` sử dụng `RequestEntity` + `HttpMethod` + middlewares (retry, cb, auth, logging).
-- Provider constants trong `<provider>/endpoint.py`; mapping trong `<provider>/acl`; **never** leak provider DTOs to Application/Domain.
+#### Observability
+- **Structured Logging**: JSON logs với correlation IDs
+- **Metrics**: Business metrics + technical metrics (optional Prometheus)
+- **Tracing**: Distributed tracing với OpenTelemetry (optional)
+- **Health Checks**: `/health` endpoint với dependency status
+
+### 6.2 Performance Requirements
+
+| Metric | Target | Measurement |
+|--------|--------|-------------|
+| **API Response Time** | p95 < 200ms, p99 < 500ms | For read operations |
+| **API Response Time** | p95 < 500ms, p99 < 1s | For write operations |
+| **Database Queries** | < 100ms per query | p95 threshold |
+| **External API Calls** | < 2s with timeout | Include retries |
+| **Memory Usage** | < 512MB per instance | Steady state |
+| **CPU Usage** | < 70% average | Under normal load |
+
+#### Performance Strategies
+- **Async I/O**: Use `async/await` cho I/O operations
+- **Connection Pooling**: Database và HTTP connection pools
+- **Caching**: Redis/Memcached cho frequently-accessed data
+- **Pagination**: Always paginate list endpoints
+- **Query Optimization**: Proper indexes, avoid N+1 queries
+
+### 6.3 Scalability & Availability
+
+#### Horizontal Scalability
+- **Stateless Services**: No server-side session state
+- **Load Balancing**: Support multiple instances behind load balancer
+- **Database Scaling**: Read replicas, connection pooling
+- **Cache Distribution**: Distributed cache (Redis Cluster)
+
+#### Availability Targets
+- **Uptime**: 99.9% (8.76 hours downtime/year)
+- **Graceful Degradation**: Service continues với reduced functionality
+- **Circuit Breakers**: Prevent cascade failures
+- **Health Checks**: Automated health monitoring
+
+### 6.4 Resilience & Fault Tolerance
+
+#### Retry & Backoff
+```python
+# Exponential backoff for external calls
+max_retries = 3
+backoff_factor = 2  # 1s, 2s, 4s
+timeout = 30  # seconds
+```
+
+#### Circuit Breaker
+- **Failure Threshold**: Open after 5 consecutive failures
+- **Timeout**: 60s before half-open attempt
+- **Success Threshold**: 2 successful calls to close
+
+#### Idempotency
+- **Write Operations**: Idempotency keys cho POST/PUT
+- **Retry Safety**: Safe to retry without side effects
+- **Deduplication**: Request deduplication based on client-provided ID
+
+### 6.5 Security Requirements
+
+#### Authentication & Authorization
+- **Authentication**: JWT tokens, OAuth 2.0, hoặc API keys
+- **Authorization**: Role-Based Access Control (RBAC)
+- **Token Expiry**: Access tokens < 1 hour, refresh tokens < 7 days
+- **Password Hashing**: bcrypt hoặc argon2 với salt
+
+#### Data Protection
+- **Encryption in Transit**: TLS 1.2+ for all external communications
+- **Encryption at Rest**: Encrypt sensitive data in database
+- **PII Handling**: Mask/redact PII in logs
+- **GDPR Compliance**: Data retention policies, right to deletion
+
+#### OWASP Top 10 Controls
+- **SQL Injection**: Parameterized queries only
+- **XSS**: Output encoding, CSP headers
+- **CSRF**: CSRF tokens for state-changing operations
+- **Security Headers**: HSTS, X-Content-Type-Options, etc.
+- **Rate Limiting**: Per-IP và per-user rate limits
+
+### 6.6 Persistence (NẾU ĐƯỢC YÊU CẦU)
+
+#### Repository Pattern
+- **Ports**: Application defines repository interfaces
+- **Adapters**: Infrastructure implements repositories
+- **Isolation**: NO DB drivers trong Domain/Application layers
+
+#### Database Requirements
+- **Migrations**: Versioned schema migrations (Alembic, Flyway)
+- **Indexes**: Proper indexes for all query patterns
+- **Transactions**: ACID transactions cho consistency
+- **Backup**: Automated daily backups với point-in-time recovery
+
+### 6.7 HTTP & External Providers
+
+#### HTTP Client Standards
+- **Base Client**: `infrastructure/http/client.py`
+- **Request Entity**: Type-safe request wrapper
+- **Middlewares**: Retry, circuit-breaker, auth, logging, correlation ID
+- **Timeout**: Default 30s, configurable per request
+
+#### Provider Integration
+- **Constants**: `<provider>/constants/` cho URLs/versions
+- **ACL Mapping**: `<provider>/acl/` cho data transformation
+- **Isolation**: Provider DTOs NEVER leak to Application/Domain
+- **Fallbacks**: Graceful degradation khi provider unavailable
+
+### 6.8 API Versioning & Compatibility
+
+#### Versioning Strategy
+- **URL Versioning**: `/api/v1/`, `/api/v2/`
+- **SemVer**: Semantic versioning cho public DTOs
+- **Backward Compatibility**: Maintain old versions for 6 months
+- **Deprecation**: Clear deprecation notices và migration guides
+
+#### API Documentation
+- **OpenAPI/Swagger**: Auto-generated API docs
+- **Examples**: Request/response examples cho mọi endpoint
+- **Changelog**: Document breaking changes
+
+### 6.9 Monitoring & Alerting
+
+#### Metrics to Monitor
+- **Request Rate**: Requests per second
+- **Error Rate**: 4xx và 5xx error percentage
+- **Latency**: p50, p95, p99 response times
+- **Resource Usage**: CPU, memory, disk, network
+- **Business Metrics**: Orders, users, transactions, etc.
+
+#### Alerting Thresholds
+- **Error Rate**: Alert if > 5% for 5 minutes
+- **Latency**: Alert if p95 > 1s for 10 minutes
+- **Availability**: Alert if health check fails 3 consecutive times
+- **Resource**: Alert if CPU > 85% or memory > 90%
 
 ============================================================================
 ## 7) TESTING & CHẤT LƯỢNG (CUNG CẤP STUBS)
