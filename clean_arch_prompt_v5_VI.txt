@@ -13,8 +13,10 @@
 10. [Tooling & Cấu Hình](#10-tooling--cấu-hình)
 11. [Execution Playbook](#11-execution-playbook)
 12. [Enterprise Essentials](#12-enterprise-essentials)
-13. [Yêu Cầu Danh Sách Thư Viện Sử Dụng](#13-yêu-cầu-danh-sách-thư-viện-sử-dụng)
-14. [Feature Switchboard](#14-feature-switchboard)
+13. [Feature Switchboard](#13-feature-switchboard)
+14. [Output Format](#14-output-format)
+15. [Yêu Cầu Danh Sách Thư Viện Sử Dụng](#15-yêu-cầu-danh-sách-thư-viện-sử-dụng)
+16. [Ground Rules](#16-ground-rules)
 
 ---
 
@@ -3603,21 +3605,15 @@ class DITestUtils:
 - (F) (Optional) Zip artifact nếu tôi ask
 
 ============================================================================
-## 15) GROUND RULES
-- Minimal deps; explicit code; isolate side effects; no vendor leaks beyond adapters/ACL.
-- Preserve the backbone across all iterations.
-- Nếu ambiguity remains after Step 1, proceed với safe defaults và note assumptions.
+## 15) YÊU CẦU DANH SÁCH THƯ VIỆN SỬ DỤNG (LIBRARY REQUIREMENTS)
 
-============================================================================
-## 13) YÊU CẦU DANH SÁCH THƯ VIỆN SỬ DỤNG (LIBRARY REQUIREMENTS)
-
-### 13.1 Mục Tiêu
+### 15.1 Mục Tiêu
 Khi AI tự động thêm thư viện vào dự án, phải cung cấp thông tin chi tiết về từng thư viện để đảm bảo tính minh bạch, khả năng bảo trì và hiểu biết về dependencies.
 
-### 13.2 Thông Tin Bắt Buộc Cho Mỗi Thư Viện
+### 15.2 Thông Tin Bắt Buộc Cho Mỗi Thư Viện
 
-#### 13.2.1 Tên Thư Viện
-- **Tên chính thức**: Tên package chính thức trên PyPI
+#### 15.2.1 Tên Thư Viện
+- **Tên chính thức**: Tên package chính thức trên registry
 - **Tên import**: Tên module khi import trong code
 - **Tên thay thế**: Các tên khác có thể gặp (aliases, nicknames)
 - **Ví dụ**: 
@@ -3625,7 +3621,7 @@ Khi AI tự động thêm thư viện vào dự án, phải cung cấp thông ti
   - Tên import: `import requests`
   - Tên thay thế: `urllib3`, `httpx`
 
-#### 13.2.2 Cách Cài Đặt
+#### 15.2.2 Cách Cài Đặt
 - **Nguồn cài đặt**: Package registry (npm, Maven, NuGet, Cargo, etc.), GitHub, local build
 - **Lệnh cài đặt**: Package manager specific (`npm install`, `mvn dependency`, `dotnet add`, `cargo add`)
 - **Yêu cầu phần cứng**: RAM, CPU, disk space tối thiểu
@@ -3652,7 +3648,7 @@ Khi AI tự động thêm thư viện vào dự án, phải cung cấp thông ti
   # OS: Windows 10+, Linux, macOS 10.14+
   ```
 
-#### 13.2.3 Tại Sao Phù Hợp
+#### 15.2.3 Tại Sao Phù Hợp
 - **Mục đích sử dụng**: HTTP client, data processing, testing framework
 - **Tính năng chính**: Async support, static typing support, performance
 - **Ưu điểm kỹ thuật**: Memory efficient, thread-safe, well-maintained
@@ -3665,7 +3661,7 @@ Khi AI tự động thêm thư viện vào dự án, phải cung cấp thông ti
   - Tương thích: Phù hợp với infrastructure layer, không leak vào domain
   ```
 
-#### 12.2.4 Thư Viện Thay Thế
+#### 15.2.4 Thư Viện Thay Thế
 - **Thư viện chính**: `httpx`, `aiohttp`, `urllib3`
 - **So sánh ngắn gọn**: Performance, features, maintenance
 - **Khi nào dùng thay thế**: Khi cần async, khi cần performance cao
@@ -3676,7 +3672,7 @@ Khi AI tự động thêm thư viện vào dự án, phải cung cấp thông ti
   - urllib3: Low-level, more control
   ```
 
-#### 12.2.5Tự Động Update
+#### 15.2.5 Tự Động Update
 - **Update strategy**: Major, minor, patch updates
 - **Breaking changes**: Cách xử lý breaking changes
 - **Testing**: Cách test sau khi update
@@ -3689,9 +3685,9 @@ Khi AI tự động thêm thư viện vào dự án, phải cung cấp thông ti
   - Rollback: Version pinning, dependency lock
   ```
 
-### 12.3 Format Báo Cáo Thư Viện
+### 15.3 Format Báo Cáo Thư Viện
 
-#### 12.3.1 Template Báo Cáo
+#### 15.3.1 Template Báo Cáo
 ```markdown
 ## Thư Viện: [Tên Thư Viện]
 
@@ -3733,7 +3729,7 @@ Khi AI tự động thêm thư viện vào dự án, phải cung cấp thông ti
 - **Rollback**: [Version pinning, dependency lock]
 ```
 
-#### 12.3.2 Ví Dụ Báo Cáo Thực Tế
+#### 15.3.2 Ví Dụ Báo Cáo Thực Tế
 ```markdown
 ## Thư Viện: requests
 
@@ -3775,29 +3771,29 @@ Khi AI tự động thêm thư viện vào dự án, phải cung cấp thông ti
 - **Rollback**: Version pinning, dependency lock
 ```
 
-### 12.4 Quy Tắc Báo Cáo Thư Viện
+### 15.4 Quy Tắc Báo Cáo Thư Viện
 
-#### 12.4.1 Bắt Buộc
+#### 15.4.1 Bắt Buộc
 - **Mỗi thư viện** phải có đầy đủ 6 thông tin trên
 - **Không được bỏ qua** bất kỳ thông tin nào
 - **Phải cập nhật** khi thêm thư viện mới
 - **Phải review** định kỳ (hàng tháng)
 
-#### 12.4.2 Tự Động Hóa
+#### 15.4.2 Tự Động Hóa
 - **Tự động generate** báo cáo khi thêm thư viện
 - **Tự động update** thông tin version
 - **Tự động check** security vulnerabilities
 - **Tự động suggest** alternatives
 
-#### 12.4.3 Validation
+#### 15.4.3 Validation
 - **Kiểm tra** thông tin chính xác
 - **Verify** compatibility với language/runtime version
 - **Check** license compatibility
 - **Validate** security status
 
-### 12.5 Integration Với CI/CD
+### 15.5 Integration Với CI/CD
 
-#### 12.5.1 Automated Library Reporting
+#### 15.5.1 Automated Library Reporting
 ```yaml
 # .github/workflows/library-report.yml
 name: Library Report
@@ -3820,7 +3816,7 @@ jobs:
           npm run suggest-alternatives
 ```
 
-#### 12.5.2 Library Monitoring
+#### 15.5.2 Library Monitoring
 ```typescript
 // scripts/library-monitor.ts
 // Language-agnostic library monitoring example
@@ -3865,36 +3861,42 @@ export class LibraryMonitor {
 }
 ```
 
-### 12.6 Best Practices
+### 15.6 Best Practices
 
-#### 12.6.1 Library Selection
+#### 15.6.1 Library Selection
 - **Ưu tiên** thư viện có community lớn
 - **Chọn** thư viện có documentation tốt
 - **Tránh** thư viện deprecated hoặc không maintain
 - **Kiểm tra** license compatibility
 
-#### 12.6.2 Version Management
+#### 15.6.2 Version Management
 - **Pin** version chính xác
 - **Update** thường xuyên
 - **Test** sau mỗi update
 - **Rollback** nếu có vấn đề
 
-#### 12.6.3 Security
+#### 15.6.3 Security
 - **Scan** security vulnerabilities
 - **Update** thường xuyên
 - **Monitor** security advisories
 - **Implement** security best practices
 
+============================================================================
+## 16) GROUND RULES
+- Minimal deps; explicit code; isolate side effects; no vendor leaks beyond adapters/ACL.
+- Preserve the backbone across all iterations.
+- Nếu ambiguity remains after Step 1, proceed với safe defaults và note assumptions.
+
 ---
 
-## 📋 TÓM TẮT NGÔN NGỮ & TOOLING
+## 📋 TÓM TẮT LANGUAGE-AGNOSTIC ARCHITECTURE
 
-> **🎯 LƯU Ý CUỐI CÙNG**: Prompt này được thiết kế cho **Python** với:
-> - **Code examples**: Python syntax và patterns
-> - **Tooling**: Python ecosystem (ruff, mypy, pytest, etc.)
-> - **Dependencies**: Python packages (requests, fastapi, sqlalchemy, etc.)
+> **🎯 LƯU Ý CUỐI CÙNG**: Prompt này được thiết kế cho **mọi ngôn ngữ hiện đại** với:
+> - **Code examples**: TypeScript, Java, C# syntax và patterns
+> - **Tooling**: Language-agnostic ecosystem (ESLint, SonarQube, Jest, etc.)
+> - **Dependencies**: Multi-language packages (axios, okhttp, Flurl, etc.)
 > 
-> **Khi áp dụng cho ngôn ngữ khác**, hãy:
+> **Khi áp dụng cho ngôn ngữ cụ thể**, hãy:
 > 1. **Giữ nguyên** các nguyên tắc kiến trúc (Clean Architecture, SOLID)
 > 2. **Chuyển đổi** syntax và patterns phù hợp với ngôn ngữ đích
 > 3. **Thay thế** tooling bằng ecosystem tương ứng
