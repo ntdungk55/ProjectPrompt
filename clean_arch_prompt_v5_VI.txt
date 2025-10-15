@@ -133,61 +133,983 @@ docs/
 
 ### 4.1 Quy Tắc Đặt Tên Data Model (bắt buộc)
 
-#### Domain Models
-- **Domain models (nghiệp vụ thuần):** đặt tên **danh từ số ít, CapWords**, không thêm hậu tố *Model*.
-  Ví dụ: `User`, `RoutePlan`, `Money`, `Email`, `LatLon`.
+#### Domain Layer
+- **Domain entities (nghiệp vụ thuần):** đặt tên **danh từ số ít, CapWords**, không thêm hậu tố *Model*.
+  Ví dụ: `User`, `Order`, `RoutePlan`, `Money`, `Email`, `LatLon`.
+  
+- **Identity Objects:** hậu tố `Id`.
+  Ví dụ: `UserId`, `OrderId`, `ProductId`.
+  
 - **Value Objects:** CapWords, tên thể hiện ý nghĩa giá trị (không ID kỹ thuật).
-  Ví dụ: `Coordinates`, `Price`, `DistanceKm`.
-- **Domain Enums:** CapWords + danh từ/tt miêu tả trạng thái.
-  Ví dụ: `OrderStatus`, `TravelMode`.
+  - **Name objects:** hậu tố `Name` khi biểu thị tên nghiệp vụ.
+    Ví dụ: `ProductName`, `CategoryName`, `CustomerName`.
+  - **Value objects khác:** Tên thể hiện ý nghĩa.
+    Ví dụ: `Coordinates`, `Price`, `DistanceKm`, `EmailAddress`, `PhoneNumber`.
+  - **Value objects trong Application:** hậu tố `Value` khi cần phân biệt rõ.
+    Ví dụ: `UserValue`, `OrderValue`.
+    
+- **Domain Enums:** CapWords + danh từ/tính từ miêu tả trạng thái, hậu tố `Status` cho trạng thái.
+  Ví dụ: `OrderStatus`, `UserStatus`, `PaymentStatus`, `TravelMode`, `Priority`.
+
+- **Domain Events:** hậu tố `Event`.
+  Ví dụ: `UserCreatedEvent`, `OrderPlacedEvent`, `PaymentProcessedEvent`.
 
 #### Application Layer
 - **Repositories / Ports (interfaces):** **không tiền tố `I`**; tên dạng *NounRepository*/*NounGateway*.
-  Ví dụ: `UserRepository`, `TrafficGateway`.
+  Ví dụ: `UserRepository`, `OrderRepository`, `TrafficGateway`, `PaymentGateway`.
+  
 - **Use Cases:** *VerbNoun* (động từ + danh từ), thể hiện hành động nghiệp vụ.
-  Ví dụ: `CreateUser`, `PlanRoute`, `GetTrafficIncidents`.
+  Ví dụ: `CreateUser`, `UpdateOrder`, `PlanRoute`, `GetTrafficIncidents`, `ProcessPayment`.
 
 #### Application DTOs (Ports layer `application/dto/`)
-- **Request DTO:** `CreateUserRequestDto`, `SearchRouteRequestDto`.
-- **Response DTO:** `UserResponseDto`, `RouteResponseDto`, `PagedUsersResponseDto`.
-- **DTO dùng chung:** `UserDto`, `RouteDto` (khi vào/ra dùng chung 1 schema).
+
+**⚠️ YÊU CẦU BẮT BUỘC CHO TẤT CẢ DTOs:**
+1. **Frozen dataclass:** Tất cả DTO PHẢI dùng `@dataclass(frozen=True)` để đảm bảo immutability.
+2. **Docstring:** Mỗi DTO PHẢI có docstring giải thích:
+   - Mục đích/trách nhiệm của DTO
+   - Lý do tạo ra DTO này (use case nào sử dụng, tại sao cần tách biệt)
+   - Layer/boundary nào sử dụng
+3. **Type hints:** Tất cả fields PHẢI có type annotation đầy đủ.
+
+**Naming Patterns:**
+
+- **Command DTO (Input cho Use Case thay đổi state):** `{Action}{Entity}CommandDto`
+  Ví dụ: `CreateUserCommandDto`, `UpdateOrderCommandDto`, `DeleteProductCommandDto`.
+  ```python
+  @dataclass(frozen=True)
+  class CreateUserCommandDto:
+      """
+      Command DTO for creating a new user.
+      
+      Purpose: Encapsulates all data required for user creation use case.
+      Used by: CreateUser use case at Application layer boundary.
+      Reason: Separates external input validation from domain logic.
+      """
+      name: str
+      email: str
+      password: str
+  ```
+
+- **Query DTO (Input cho Use Case chỉ đọc):** `{Action}{Entity}QueryDto`
+  Ví dụ: `GetUserQueryDto`, `SearchOrdersQueryDto`, `ListProductsQueryDto`.
+  ```python
+  @dataclass(frozen=True)
+  class SearchOrdersQueryDto:
+      """
+      Query DTO for searching orders with filters.
+      
+      Purpose: Encapsulates search criteria for order queries.
+      Used by: SearchOrders use case at Application layer boundary.
+      Reason: Provides type-safe query parameters, prevents SQL injection.
+      """
+      customer_id: str | None = None
+      status: str | None = None
+      from_date: str | None = None  # ISO-8601
+      to_date: str | None = None    # ISO-8601
+      page: int = 1
+      page_size: int = 20
+  ```
+
+- **Response DTO (Output từ Use Case):** `{Action}{Entity}ResponseDto` hoặc `{Entity}ResponseDto`
+  Ví dụ: `CreateUserResponseDto`, `UserResponseDto`, `OrderResponseDto`, `PagedOrdersResponseDto`.
+  ```python
+  @dataclass(frozen=True)
+  class CreateUserResponseDto:
+      """
+      Response DTO for user creation operation.
+      
+      Purpose: Returns created user data to presentation layer.
+      Used by: CreateUser use case output.
+      Reason: Prevents exposure of internal entity details, controls API contract.
+      """
+      user_id: str
+      name: str
+      email: str
+      created_at: str  # ISO-8601
+  ```
+
+- **Result DTO (Intermediate results giữa các tầng):** `{Entity}ResultDto`
+  Ví dụ: `UserResultDto`, `OrderResultDto`, `ValidationResultDto`.
+  ```python
+  @dataclass(frozen=True)
+  class ValidationResultDto:
+      """
+      Result DTO for validation operations.
+      
+      Purpose: Carries validation results between application components.
+      Used by: Validation workflows in Application layer.
+      Reason: Standardizes validation output format across use cases.
+      """
+      is_valid: bool
+      errors: tuple[str, ...]  # Use tuple for immutability
+  ```
+
+- **Event DTO (Domain events serialized):** `{Entity}EventDto`
+  Ví dụ: `UserCreatedEventDto`, `OrderPlacedEventDto`.
+  ```python
+  @dataclass(frozen=True)
+  class UserCreatedEventDto:
+      """
+      Event DTO for user creation domain event.
+      
+      Purpose: Serialized representation of UserCreated domain event.
+      Used by: Event bus/message queue at infrastructure boundary.
+      Reason: Decouples domain events from message broker schema.
+      """
+      event_id: str
+      user_id: str
+      occurred_at: str  # ISO-8601
+      user_data: dict[str, Any]
+  ```
+
 - **Versioning:** chèn `V1`, `V2` **trước** hậu tố `Dto`.
-  Ví dụ: `UserResponseV2Dto`, `CreateUserRequestV1Dto`.
-- **Trường trong DTO:** bám sát schema provider (giữ `snake_case` nếu API như vậy); domain sẽ map sang camelCase.
+  Ví dụ: `CreateUserCommandV2Dto`, `UserResponseV1Dto`.
 
-#### Persistence Layer
-- **DB Entities / ORM models:** hậu tố **`Entity`**: `UserEntity`, `RouteEntity`, `CacheEntryEntity`.
-- **Bảng nối/khóa tổng hợp:** `UserRouteLinkEntity`, `UserRouteCrossRefEntity`.
-- **DAO/Repositories cụ thể hạ tầng:** `UserSqlRepository`, `RouteDao` (tùy công nghệ).
+- **Wrapper số nhiều / phân trang:**
+  - Danh sách: `{Entity}ListResponseDto` hoặc `{Entity}sResponseDto`
+    Ví dụ: `UserListResponseDto`, `OrdersResponseDto`.
+  - Phân trang: `Paged{Entity}sResponseDto`
+    Ví dụ: `PagedUsersResponseDto`, `PagedOrdersResponseDto`.
+  ```python
+  @dataclass(frozen=True)
+  class PagedUsersResponseDto:
+      """
+      Paginated response DTO for user listings.
+      
+      Purpose: Standardized pagination wrapper for user collections.
+      Used by: List/Search user use cases output.
+      Reason: Consistent pagination contract across all list endpoints.
+      """
+      items: tuple[UserResponseDto, ...]  # Use tuple for immutability
+      page: int
+      page_size: int
+      total: int
+      has_next: bool
+  ```
 
-#### UI-facing Models (nếu có tầng interfaces)
-- **UI Model:** `UserUiModel`, `RouteUiModel`.
-- **UI State / Events / Effects:** `UserUiState`, `UserEvent`, `UserEffect`.
+- **Trường trong DTO:** 
+  - Bám sát schema provider (giữ `snake_case` nếu API như vậy)
+  - Domain sẽ map sang camelCase khi cần
+  - Prefer immutable types: `tuple` thay vì `list`, `frozenset` thay vì `set`
+
+#### Infrastructure Layer
+
+- **External Provider Request DTO:** `{Provider}{Entity}RequestDto`
+  Ví dụ: `GoogleMapsRouteRequestDto`, `StripePaymentRequestDto`, `Auth0UserRequestDto`.
+  ```python
+  @dataclass(frozen=True)
+  class StripePaymentRequestDto:
+      """
+      Request DTO for Stripe payment API.
+      
+      Purpose: Encapsulates data for Stripe payment API calls.
+      Used by: Stripe payment gateway adapter in Infrastructure layer.
+      Reason: Isolates external API schema from domain, enables provider switching.
+      """
+      amount: int  # Amount in cents
+      currency: str
+      source: str
+      description: str
+  ```
+
+- **External Provider Response DTO:** `{Provider}{Entity}ResponseDto`
+  Ví dụ: `GoogleMapsRouteResponseDto`, `StripePaymentResponseDto`, `Auth0UserResponseDto`.
+  ```python
+  @dataclass(frozen=True)
+  class StripePaymentResponseDto:
+      """
+      Response DTO from Stripe payment API.
+      
+      Purpose: Captures Stripe API response data.
+      Used by: Stripe payment gateway adapter in Infrastructure layer.
+      Reason: Maps external API response to internal types via ACL.
+      """
+      payment_id: str
+      status: str
+      amount: int
+      created: int  # Unix timestamp
+  ```
+
+- **Database Models:** `{Database}{Entity}ModelDto` hoặc `{Entity}Entity` (ưu tiên `Entity`)
+  Ví dụ: `UserEntity`, `OrderEntity`, `PostgresUserModelDto` (nếu cần phân biệt DB).
+  ```python
+  @dataclass(frozen=True)
+  class UserEntity:
+      """
+      Database entity for user persistence.
+      
+      Purpose: ORM model for users table in PostgreSQL.
+      Used by: UserSqlRepository in Infrastructure layer.
+      Reason: Separates persistence schema from domain model.
+      """
+      id: str
+      name: str
+      email: str
+      password_hash: str
+      created_at: str
+      updated_at: str
+  ```
+
+- **Bảng nối/khóa tổng hợp:** `{Entity1}{Entity2}LinkEntity`, `{Entity1}{Entity2}CrossRefEntity`.
+  Ví dụ: `UserOrderLinkEntity`, `ProductCategoryLinkEntity`.
+
+- **DAO/Repositories cụ thể hạ tầng:** `{Entity}{Technology}Repository` hoặc `{Entity}Dao`.
+  Ví dụ: `UserSqlRepository`, `OrderPostgresRepository`, `ProductDao`.
+
+#### Interfaces Layer (UI-facing Models)
+
+**⚠️ YÊU CẦU BẮT BUỘC CHO UI MODELS:**
+1. **Frozen dataclass:** Tất cả UI model PHẢI dùng `@dataclass(frozen=True)`.
+2. **Docstring:** Mỗi UI model PHẢI giải thích mục đích hiển thị.
+3. **Type hints:** Đầy đủ type annotation.
+4. **KHÔNG dùng hậu tố Dto:** UI models là view models/presentation models, không phải DTOs.
+
+- **UI Model (Presentation data):** `{Entity}UiModel`
+  Ví dụ: `UserUiModel`, `OrderUiModel`, `DashboardUiModel`.
+  ```python
+  @dataclass(frozen=True)
+  class UserUiModel:
+      """
+      UI model for user display in presentation layer.
+      
+      Purpose: Optimized user data format for UI rendering.
+      Used by: User profile views, user list components.
+      Reason: Includes only UI-relevant fields, pre-formatted for display.
+      """
+      display_name: str
+      email: str
+      avatar_url: str
+      role_label: str  # Human-readable role
+      status_badge: str  # "Active" | "Inactive" | "Suspended"
+      member_since: str  # Formatted date: "January 2024"
+  ```
+
+- **UI State (Component state):** `{Feature}UiState`
+  Ví dụ: `UserProfileUiState`, `OrderListUiState`, `LoginFormUiState`.
+  ```python
+  @dataclass(frozen=True)
+  class OrderListUiState:
+      """
+      UI state for order list page.
+      
+      Purpose: Manages order list view state.
+      Used by: Order list component/controller.
+      Reason: Centralizes UI state management, enables state persistence.
+      """
+      orders: tuple[OrderUiModel, ...]
+      is_loading: bool
+      selected_filter: str
+      current_page: int
+      error_message: str | None = None
+  ```
+
+- **UI Event (User actions):** `{Feature}UiEvent`
+  Ví dụ: `UserClickedSubmitEvent`, `OrderFilterChangedEvent`.
+  ```python
+  @dataclass(frozen=True)
+  class OrderFilterChangedEvent:
+      """
+      UI event when order filter changes.
+      
+      Purpose: Captures user filter interaction.
+      Used by: Order list event handlers.
+      Reason: Type-safe event payload for state updates.
+      """
+      filter_type: str  # "status" | "date" | "customer"
+      filter_value: str
+      timestamp: str  # ISO-8601
+  ```
+
+- **UI Effect (Side effects):** `{Feature}UiEffect`
+  Ví dụ: `ShowNotificationEffect`, `NavigateToPageEffect`, `ScrollToTopEffect`.
+  ```python
+  @dataclass(frozen=True)
+  class ShowNotificationEffect:
+      """
+      UI effect for showing notification.
+      
+      Purpose: Declarative notification display instruction.
+      Used by: UI effect handlers in presentation layer.
+      Reason: Decouples business logic from UI side effects.
+      """
+      message: str
+      notification_type: str  # "success" | "error" | "warning" | "info"
+      duration_ms: int = 3000
+  ```
+
+- **Form Model (Form input/validation):** `{Feature}Form`
+  Ví dụ: `LoginForm`, `CreateOrderForm`, `UserProfileForm`.
+  ```python
+  @dataclass(frozen=True)
+  class CreateOrderForm:
+      """
+      Form model for order creation.
+      
+      Purpose: Captures and validates order form input.
+      Used by: Order creation form component.
+      Reason: Client-side validation before sending to backend.
+      """
+      customer_id: str
+      product_ids: tuple[str, ...]
+      shipping_address: str
+      notes: str = ""
+  ```
 
 #### Mapper/Translator Naming
-- Hàm/Method: `to_domain()`, `to_dto()`, `to_entity()`, `to_ui_model()`.
-- File/Type tổng hợp có thể dùng `*Mapper`: `UserMapper`, `RouteMapper`.
+- **Hàm/Method:** `to_domain()`, `to_dto()`, `to_entity()`, `to_ui_model()`, `to_command()`, `to_query()`.
+  ```python
+  def to_domain(dto: CreateUserCommandDto) -> User:
+      """Convert command DTO to domain entity."""
+      return User(name=dto.name, email=dto.email)
+  
+  def to_dto(entity: User) -> UserResponseDto:
+      """Convert domain entity to response DTO."""
+      return UserResponseDto(user_id=entity.id, name=entity.name, email=entity.email)
+  ```
+  
+- **File/Type tổng hợp:** `{Entity}Mapper`, `{Entity}Translator`.
+  Ví dụ: `UserMapper`, `OrderMapper`, `RouteTranslator`.
+  
+- **ACL Mappers (Anti-Corruption Layer):** `{Provider}{Entity}Mapper`.
+  Ví dụ: `StripePaymentMapper`, `GoogleMapsRouteMapper`, `Auth0UserMapper`.
+  
 - **Không** chứa logic nghiệp vụ trong mapper; chỉ chuyển đổi dữ liệu và normalizing nhẹ.
 
 #### Quy Tắc Đặt Tên Đặc Biệt
-- **Boolean prefix:** `is*`, `has*`, `can*` (ví dụ: `is_active`, `has_location`, `can_retry`).
-- **Datetime/timestamp:** `depart_at`, `arrive_at`, `updated_at`, tất cả ở **ISO-8601** tại boundary.
-- **Wrapper số nhiều / phân trang:**
-  - Danh sách: `UsersResponseDto` hoặc `UserListResponseDto`.
-  - Phân trang: `PagedUsersResponseDto` (chứa `items`, `page`, `page_size`, `total`).
 
-#### Ràng Buộc Kiến Trúc
-- **Domain/Application** **không** phụ thuộc provider/vendor types.
-- **DTO provider** chỉ nằm ở `infrastructure/<provider>/acl` (mappers/translators) và `application/dto/` khi đã chuẩn hóa schema công khai.
-- **Không tái dùng `Entity` làm `Dto`** (tránh rò dữ liệu nội bộ/PII).
+- **Boolean fields:** prefix `is_*`, `has_*`, `can_*`, `should_*`.
+  Ví dụ: `is_active`, `is_verified`, `has_location`, `has_premium`, `can_retry`, `should_notify`.
+
+- **Datetime/timestamp fields:** suffix `_at` cho timestamp, `_date` cho date-only.
+  - Timestamp: `created_at`, `updated_at`, `deleted_at`, `occurred_at`, `expires_at`.
+  - Date: `birth_date`, `start_date`, `end_date`.
+  - **Format:** ISO-8601 tại tất cả boundaries (DTOs, external APIs).
+  
+- **Count/quantity fields:** prefix `num_*` hoặc `total_*`, suffix `_count`.
+  Ví dụ: `num_items`, `total_orders`, `item_count`, `page_count`.
+
+- **Status/state fields:** suffix `_status` hoặc `_state`.
+  Ví dụ: `order_status`, `payment_status`, `workflow_state`, `connection_state`.
+
+- **ID fields:** suffix `_id` cho string IDs.
+  Ví dụ: `user_id`, `order_id`, `transaction_id`, `correlation_id`.
+
+- **List/collection fields trong DTOs:** 
+  - Prefer `tuple` cho immutability: `items: tuple[UserDto, ...]`
+  - Nếu cần list semantics: `user_list`, `order_items`, `product_ids`.
+
+- **Optional/nullable fields:** Sử dụng `| None` type hint, suffix `_optional` nếu cần làm rõ.
+  Ví dụ: `middle_name: str | None`, `discount_code: str | None`.
+
+- **URL/URI fields:** suffix `_url` hoặc `_uri`.
+  Ví dụ: `avatar_url`, `callback_url`, `webhook_uri`, `resource_uri`.
+
+- **Money/currency fields:** prefix với currency hoặc suffix `_amount`.
+  Ví dụ: `usd_amount`, `price_amount`, `total_amount`, `discount_amount`.
+
+#### Ràng Buộc Kiến Trúc (Architecture Constraints)
+
+**🚫 NGHIÊM CẤM (FORBIDDEN):**
+
+1. **Không tái dùng Entity làm Dto**
+   - Entity và DTO phải tách biệt hoàn toàn
+   - Lý do: Tránh rò dữ liệu nội bộ/PII, tách persistence schema khỏi API contract
+   ```python
+   # ❌ BAD
+   def get_user(user_id: str) -> UserEntity:
+       return repository.find_by_id(user_id)  # Exposes internal entity
+   
+   # ✅ GOOD
+   def get_user(user_id: str) -> UserResponseDto:
+       entity = repository.find_by_id(user_id)
+       return to_dto(entity)  # Maps to safe DTO
+   ```
+
+2. **Không để Domain/Application phụ thuộc vào provider/vendor types**
+   - Domain/Application KHÔNG được import types từ external libraries
+   - Lý do: Bảo vệ business logic khỏi vendor lock-in
+   ```python
+   # ❌ BAD - Domain depends on Stripe
+   from stripe import PaymentIntent
+   class Order:
+       def __init__(self, payment: PaymentIntent): ...
+   
+   # ✅ GOOD - Domain uses own types
+   from domain.value_objects import Payment
+   class Order:
+       def __init__(self, payment: Payment): ...
+   ```
+
+3. **Không dùng mutable collections trong DTOs**
+   - Prefer `tuple`, `frozenset` thay vì `list`, `set`
+   - Lý do: Immutability prevents accidental mutations
+   ```python
+   # ❌ BAD
+   @dataclass(frozen=True)
+   class OrderDto:
+       items: list[str]  # Mutable despite frozen=True!
+   
+   # ✅ GOOD
+   @dataclass(frozen=True)
+   class OrderDto:
+       items: tuple[str, ...]  # Truly immutable
+   ```
+
+4. **Không skip frozen=True cho DTOs**
+   - Tất cả DTO/VO PHẢI dùng `@dataclass(frozen=True)`
+   - Lý do: Immutability ensures data integrity across boundaries
+   ```python
+   # ❌ BAD
+   @dataclass
+   class UserDto:
+       name: str
+   
+   # ✅ GOOD
+   @dataclass(frozen=True)
+   class UserDto:
+       name: str
+   ```
+
+**✅ BẮT BUỘC (REQUIRED):**
+
+1. **DTO provider chỉ nằm ở:**
+   - `infrastructure/<provider>/acl/` - Mappers/translators cho external providers
+   - `application/dto/` - DTOs đã chuẩn hóa schema công khai
+   
+2. **Mỗi DTO phải có docstring đầy đủ:**
+   ```python
+   @dataclass(frozen=True)
+   class CreateUserCommandDto:
+       """
+       [Purpose]: What this DTO does
+       [Used by]: Which component/use case uses it
+       [Reason]: Why we created this separate DTO
+       """
+       name: str
+   ```
+
+3. **Type hints đầy đủ cho tất cả fields:**
+   ```python
+   # ❌ BAD - Missing type hints
+   @dataclass(frozen=True)
+   class UserDto:
+       name = ""
+       age = 0
+   
+   # ✅ GOOD - Full type hints
+   @dataclass(frozen=True)
+   class UserDto:
+       name: str
+       age: int
+       email: str | None = None
+   ```
+
+4. **Layer separation cho Data Models:**
+   - **Application DTOs:** Command, Query, Response, Result, Event (có hậu tố "Dto")
+   - **Infrastructure DTOs:** Provider-specific Request/Response, Entity (có hậu tố "Dto" hoặc "Entity")
+   - **Interfaces UI Models:** UiModel, UiState, UiEvent, UiEffect, Form (KHÔNG có hậu tố "Dto")
+   - **NO cross-layer reuse** - Mỗi layer có data models riêng
+
+5. **Immutable types preference:**
+   - Collections: `tuple` > `list`, `frozenset` > `set`
+   - Mappings: `MappingProxyType` hoặc `dict` với frozen dataclass
+   - Strings/primitives: Already immutable
+
+**📋 PATTERNS TO FOLLOW:**
+
+1. **CQRS Pattern trong DTOs:**
+   - Commands: Mutate state → `{Action}{Entity}CommandDto`
+   - Queries: Read-only → `{Action}{Entity}QueryDto`
+   - Clear separation of write/read models
+
+2. **Anti-Corruption Layer (ACL):**
+   - Mỗi external provider có mapper riêng trong `infrastructure/<provider>/acl/`
+   - Provider DTOs **KHÔNG BAO GIỜ** leak ra ngoài infrastructure layer
+   ```
+   infrastructure/
+     stripe/
+       acl/
+         stripe_payment_mapper.py  # Maps StripePaymentDto <-> Payment domain
+       dto/
+         stripe_payment_request_dto.py
+         stripe_payment_response_dto.py
+   ```
+
+3. **Versioning Strategy:**
+   - Insert version **TRƯỚC** hậu tố Dto: `UserResponseV2Dto`
+   - Maintain old versions cho backward compatibility
+   - Deprecate explicitly với docstring và warnings
+
+4. **Pagination Pattern:**
+   - Always use `PagedResponseDto` wrapper
+   - Include: `items`, `page`, `page_size`, `total`, `has_next`
+   - Items PHẢI là `tuple` not `list`
+
+#### Tóm Tắt Quy Tắc Đặt Tên (Quick Reference)
+
+**DOMAIN LAYER:**
+```
+{Entity}                          → User, Order, Product
+{Entity}Id                        → UserId, OrderId, ProductId
+{Entity}Name                      → ProductName, CategoryName
+{Entity}Status                    → OrderStatus, UserStatus, PaymentStatus
+{Entity}Event                     → UserCreatedEvent, OrderPlacedEvent
+{ValueObject}                     → Money, Email, Coordinates, Price
+```
+
+**APPLICATION LAYER:**
+```
+{Entity}Repository                → UserRepository, OrderRepository
+{Entity}Gateway                   → PaymentGateway, NotificationGateway
+{Action}{Entity}                  → CreateUser, UpdateOrder, GetProduct (Use Cases)
+
+{Action}{Entity}CommandDto        → CreateUserCommandDto, UpdateOrderCommandDto
+{Action}{Entity}QueryDto          → GetUserQueryDto, SearchOrdersQueryDto
+{Action}{Entity}ResponseDto       → CreateUserResponseDto, UserResponseDto
+{Entity}ResponseDto               → UserResponseDto, OrderResponseDto
+{Entity}ResultDto                 → ValidationResultDto, ProcessingResultDto
+{Entity}EventDto                  → UserCreatedEventDto, OrderPlacedEventDto
+{Entity}ListResponseDto           → UserListResponseDto, OrderListResponseDto
+Paged{Entity}sResponseDto         → PagedUsersResponseDto, PagedOrdersResponseDto
+```
+
+**INFRASTRUCTURE LAYER:**
+```
+{Provider}{Entity}RequestDto      → StripePaymentRequestDto, GoogleMapsRouteRequestDto
+{Provider}{Entity}ResponseDto     → StripePaymentResponseDto, Auth0UserResponseDto
+{Provider}{Entity}Mapper          → StripePaymentMapper, GoogleMapsRouteMapper
+{Entity}Entity                    → UserEntity, OrderEntity (Database models)
+{Entity1}{Entity2}LinkEntity      → UserOrderLinkEntity, ProductCategoryLinkEntity
+{Entity}{Tech}Repository          → UserSqlRepository, OrderPostgresRepository
+```
+
+**INTERFACES LAYER (UI) - NO "Dto" suffix:**
+```
+{Entity}UiModel                   → UserUiModel, OrderUiModel, DashboardUiModel
+{Feature}UiState                  → UserProfileUiState, OrderListUiState
+{Feature}UiEvent                  → UserClickedSubmitEvent, OrderFilterChangedEvent
+{Feature}UiEffect                 → ShowNotificationEffect, NavigateToPageEffect
+{Feature}Form                     → LoginForm, CreateOrderForm, UserProfileForm
+```
+
+**MAPPERS:**
+```
+{Entity}Mapper                    → UserMapper, OrderMapper
+{Provider}{Entity}Mapper          → StripePaymentMapper, GoogleMapsRouteMapper
+to_domain()                       → Converts DTO → Domain Entity
+to_dto()                          → Converts Domain Entity → DTO
+to_entity()                       → Converts Domain → DB Entity
+to_ui_model()                     → Converts DTO → UI Model
+to_command()                      → Converts Input → Command DTO
+to_query()                        → Converts Input → Query DTO
+```
+
+**FIELD NAMING:**
+```
+is_*, has_*, can_*, should_*      → Boolean fields
+*_at                              → Timestamp fields (ISO-8601)
+*_date                            → Date-only fields
+*_id                              → ID fields
+*_count, num_*, total_*           → Count/quantity fields
+*_status, *_state                 → Status/state fields
+*_url, *_uri                      → URL/URI fields
+*_amount                          → Money/currency fields
+```
+
+**VERSIONING:**
+```
+{Entity}ResponseV2Dto             → Versioned response (V2)
+CreateUserCommandV1Dto            → Versioned command (V1)
+```
+
+**CRITICAL RULES:**
+```
+✅ ALWAYS frozen=True              → All DTOs, VOs, UI Models
+✅ ALWAYS docstring                → Every DTO/UI Model must explain Purpose/Used by/Reason
+✅ ALWAYS type hints               → Full type annotations
+✅ ALWAYS tuple not list           → Collections in frozen dataclasses
+✅ ALWAYS separate layers          → No Entity as Dto, no cross-layer reuse
+✅ ALWAYS ISO-8601                 → Datetime at all boundaries
+✅ UI Models NO "Dto" suffix       → UserUiModel (NOT UserUiModelDto)
+
+❌ NEVER Entity as Dto             → Separate types always
+❌ NEVER mutable collections       → Use tuple, frozenset
+❌ NEVER skip frozen=True          → For DTOs/VOs/UI Models
+❌ NEVER skip docstring            → Explain every DTO/UI Model
+❌ NEVER vendor types in Domain    → Keep domain pure
+❌ NEVER "Dto" suffix for UI       → UI Models are view models, not DTOs
+```
+
+#### Ví Dụ Hoàn Chỉnh: DTO Documentation Best Practices
+
+**Example 1: Command DTO với đầy đủ documentation**
+```python
+# File: app/application/dto/create_user_command_dto.py
+from dataclasses import dataclass
+from typing import Literal
+
+@dataclass(frozen=True)
+class CreateUserCommandDto:
+    """
+    Command DTO for creating a new user in the system.
+    
+    Purpose:
+        Encapsulates all required and optional data for user creation.
+        Validates input at the application boundary before reaching domain.
+        
+    Used by:
+        - CreateUser use case (application/use_cases/create_user.py)
+        - User registration API endpoint (interfaces/api/v1/users.py)
+        
+    Reason:
+        Separates external API input validation from domain user creation logic.
+        Allows API schema to evolve independently of domain model.
+        Prevents exposing domain entity constructors directly to external clients.
+        
+    Example:
+        >>> cmd = CreateUserCommandDto(
+        ...     name="John Doe",
+        ...     email="john@example.com",
+        ...     password="secure_password_123",
+        ...     role="customer"
+        ... )
+        >>> result = create_user_use_case.execute(cmd)
+    """
+    name: str
+    email: str
+    password: str  # Plain text, will be hashed in domain
+    role: Literal["admin", "customer", "guest"] = "customer"
+    
+    def __post_init__(self) -> None:
+        """
+        Validation logic for DTO fields.
+        
+        Note: Only basic format validation here.
+        Business rules validated in domain layer.
+        """
+        if not self.name or len(self.name.strip()) == 0:
+            raise ValueError("Name cannot be empty")
+        if not self.email or "@" not in self.email:
+            raise ValueError("Invalid email format")
+        if len(self.password) < 8:
+            raise ValueError("Password must be at least 8 characters")
+```
+
+**Example 2: Query DTO với pagination**
+```python
+# File: app/application/dto/search_orders_query_dto.py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class SearchOrdersQueryDto:
+    """
+    Query DTO for searching and filtering orders.
+    
+    Purpose:
+        Provides type-safe query parameters for order search operations.
+        Supports filtering by multiple criteria with pagination.
+        
+    Used by:
+        - SearchOrders use case (application/use_cases/search_orders.py)
+        - Order list API endpoint (interfaces/api/v1/orders.py)
+        - Admin dashboard order search (interfaces/admin/orders.py)
+        
+    Reason:
+        Centralizes query parameter validation and prevents SQL injection.
+        Decouples API query parameters from repository implementation.
+        Enables consistent pagination across all search endpoints.
+        
+    Fields:
+        customer_id: Optional filter by customer ID
+        status: Optional filter by order status
+        from_date: Start date in ISO-8601 format (inclusive)
+        to_date: End date in ISO-8601 format (inclusive)
+        page: Page number (1-indexed)
+        page_size: Number of items per page (max 100)
+    """
+    customer_id: str | None = None
+    status: str | None = None
+    from_date: str | None = None  # ISO-8601
+    to_date: str | None = None    # ISO-8601
+    page: int = 1
+    page_size: int = 20
+    
+    def __post_init__(self) -> None:
+        """Validate pagination parameters."""
+        if self.page < 1:
+            raise ValueError("Page must be >= 1")
+        if self.page_size < 1 or self.page_size > 100:
+            raise ValueError("Page size must be between 1 and 100")
+```
+
+**Example 3: Response DTO với nested data**
+```python
+# File: app/application/dto/order_response_dto.py
+from dataclasses import dataclass
+from decimal import Decimal
+
+@dataclass(frozen=True)
+class OrderItemResponseDto:
+    """
+    Nested DTO for order items.
+    
+    Purpose: Represents a single item within an order response.
+    Used by: OrderResponseDto as part of order details.
+    Reason: Separates item data from order data for clarity.
+    """
+    product_id: str
+    product_name: str
+    quantity: int
+    unit_price: Decimal
+    total_price: Decimal
+
+@dataclass(frozen=True)
+class OrderResponseDto:
+    """
+    Response DTO for order data.
+    
+    Purpose:
+        Returns complete order information to presentation layer.
+        Includes calculated totals and formatted customer data.
+        
+    Used by:
+        - GetOrder use case (application/use_cases/get_order.py)
+        - CreateOrder use case (application/use_cases/create_order.py)
+        - Order detail API endpoint (interfaces/api/v1/orders/{id}.py)
+        
+    Reason:
+        Prevents exposure of internal order entity structure.
+        Controls exactly what data is sent to clients.
+        Pre-calculates totals to avoid client-side computation.
+        Formats data for optimal API consumption.
+        
+    Example:
+        >>> order_dto = OrderResponseDto(
+        ...     order_id="ord_123",
+        ...     customer_id="cust_456",
+        ...     customer_name="John Doe",
+        ...     items=(
+        ...         OrderItemResponseDto("prod_1", "Widget", 2, Decimal("10.00"), Decimal("20.00")),
+        ...     ),
+        ...     subtotal=Decimal("20.00"),
+        ...     tax=Decimal("2.00"),
+        ...     total=Decimal("22.00"),
+        ...     status="pending",
+        ...     created_at="2024-01-15T10:30:00Z"
+        ... )
+    """
+    order_id: str
+    customer_id: str
+    customer_name: str
+    items: tuple[OrderItemResponseDto, ...]  # Use tuple for immutability
+    subtotal: Decimal
+    tax: Decimal
+    total: Decimal
+    status: str
+    created_at: str  # ISO-8601
+    updated_at: str  # ISO-8601
+    notes: str | None = None
+```
+
+**Example 4: UI Model với pre-formatted data (NO "Dto" suffix)**
+```python
+# File: app/interfaces/models/user_ui_model.py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class UserUiModel:
+    """
+    UI model for user display in web interface.
+    
+    Purpose:
+        Optimized user data format specifically for UI rendering.
+        Includes pre-formatted strings and UI-specific fields.
+        
+    Used by:
+        - User profile view template (interfaces/web/templates/user_profile.html)
+        - User list component (interfaces/web/components/user_list.tsx)
+        - Admin user management panel (interfaces/admin/users.py)
+        
+    Reason:
+        Separates presentation concerns from business data.
+        Pre-formats complex data (dates, status badges) on backend.
+        Reduces frontend logic and ensures consistent formatting.
+        Includes only UI-relevant fields, omits sensitive data.
+        
+    Note:
+        UI models are VIEW MODELS, not DTOs. They don't use "Dto" suffix.
+        
+    Fields:
+        user_id: Unique identifier for links/actions
+        display_name: Full name formatted for display
+        email: User email (may be masked for privacy)
+        avatar_url: Full URL to user avatar image
+        role_label: Human-readable role ("Administrator", "Customer")
+        status_badge: Formatted status ("Active", "Inactive", "Suspended")
+        member_since: Formatted date ("Member since January 2024")
+        last_login: Formatted relative time ("Last login 2 hours ago")
+        is_online: Current online status
+    """
+    user_id: str
+    display_name: str
+    email: str
+    avatar_url: str
+    role_label: str
+    status_badge: str
+    member_since: str
+    last_login: str
+    is_online: bool
+```
+
+**Example 5: Provider-specific DTO trong Infrastructure**
+```python
+# File: app/infrastructure/stripe/dto/stripe_payment_request_dto.py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class StripePaymentRequestDto:
+    """
+    Request DTO for Stripe Payment Intent API.
+    
+    Purpose:
+        Encapsulates data required for creating a Stripe payment intent.
+        Maps internal payment data to Stripe-specific schema.
+        
+    Used by:
+        - StripePaymentGateway adapter (infrastructure/stripe/gateway.py)
+        - StripePaymentMapper ACL (infrastructure/stripe/acl/mapper.py)
+        
+    Reason:
+        Isolates Stripe API schema from domain payment model.
+        Enables switching payment providers without domain changes.
+        Centralizes Stripe-specific field transformations.
+        Documents Stripe API requirements explicitly.
+        
+    Stripe API Reference:
+        https://stripe.com/docs/api/payment_intents/create
+        
+    Fields:
+        amount: Amount in cents (Stripe requirement)
+        currency: ISO 4217 currency code (lowercase per Stripe)
+        source: Payment source ID (card token or source object)
+        description: Payment description for Stripe dashboard
+        metadata: Custom key-value pairs for tracking
+    """
+    amount: int  # Amount in cents (e.g., 1000 = $10.00)
+    currency: str  # Must be lowercase: "usd", "eur", etc.
+    source: str
+    description: str
+    metadata: dict[str, str] | None = None
+    
+    def __post_init__(self) -> None:
+        """Validate Stripe-specific constraints."""
+        if self.amount < 0:
+            raise ValueError("Amount must be non-negative")
+        if self.currency != self.currency.lower():
+            raise ValueError("Currency must be lowercase per Stripe API")
+        if len(self.description) > 1000:
+            raise ValueError("Description max length is 1000 chars")
+```
+
+**Example 6: Event DTO cho messaging**
+```python
+# File: app/application/dto/user_created_event_dto.py
+from dataclasses import dataclass
+from typing import Any
+
+@dataclass(frozen=True)
+class UserCreatedEventDto:
+    """
+    Event DTO for user creation domain event.
+    
+    Purpose:
+        Serializable representation of UserCreated domain event.
+        Used for publishing to message queue and event sourcing.
+        
+    Used by:
+        - Event bus publisher (infrastructure/messaging/event_publisher.py)
+        - Event store persistence (infrastructure/event_store/repository.py)
+        - External event consumers (downstream microservices)
+        
+    Reason:
+        Decouples domain events from message broker schema.
+        Provides stable event schema for external consumers.
+        Enables event versioning without breaking domain model.
+        Ensures events are immutable and serializable.
+        
+    Event Schema Version: 1.0
+    
+    Fields:
+        event_id: Unique identifier for this event instance
+        aggregate_id: ID of the user (aggregate root)
+        occurred_at: When the event occurred (ISO-8601)
+        event_type: Type discriminator ("UserCreated")
+        version: Event schema version for compatibility
+        user_data: User details at time of creation
+        metadata: Additional context (correlation_id, causation_id, etc.)
+    """
+    event_id: str
+    aggregate_id: str  # user_id
+    occurred_at: str   # ISO-8601
+    event_type: str = "UserCreated"
+    version: str = "1.0"
+    user_data: dict[str, Any] | None = None
+    metadata: dict[str, str] | None = None
+```
 
 ### 4.2 Tiêu Chuẩn Code Chung
 
 #### Language & Type Safety
-- Python 3.11+, full type hints; prefer `@dataclass(frozen=True)` cho DTO/VO.
-- One public **class per file** (helpers/private classes allowed sparingly).
-- Avoid **globals/singletons**; use DI cho dependencies.
-- No wildcard imports, no `print` trong prod, no mutable default args.
+- **Python 3.11+** với full type hints cho tất cả code.
+- **BẮT BUỘC `@dataclass(frozen=True)`** cho:
+  - Tất cả DTOs (Command, Query, Response, Result, Event) - Application/Infrastructure
+  - Tất cả Value Objects trong Domain
+  - Tất cả UI Models (UiModel, UiState, UiEvent, UiEffect, Form) - Interfaces layer
+  - Bất kỳ data class nào cross boundaries giữa các layers
+  ```python
+  # ✅ CORRECT - Always frozen for DTOs
+  from dataclasses import dataclass
+  
+  @dataclass(frozen=True)
+  class CreateUserCommandDto:
+      """Command DTO - must be immutable."""
+      name: str
+      email: str
+  
+  @dataclass(frozen=True)
+  class Money:
+      """Value Object - must be immutable."""
+      amount: Decimal
+      currency: str
+  
+  @dataclass(frozen=True)
+  class UserUiModel:
+      """UI Model - must be immutable (NO "Dto" suffix)."""
+      display_name: str
+      email: str
+  ```
+  
+- **KHÔNG BẮT BUỘC `frozen=True`** cho:
+  - Domain Entities (có thể mutable nếu business logic yêu cầu)
+  - Internal helpers/builders (không cross boundaries)
+  ```python
+  # ✅ OK - Entity có thể mutable
+  @dataclass
+  class User:
+      """Domain entity - may have mutable behavior."""
+      id: UserId
+      name: str
+      email: str
+      
+      def update_email(self, new_email: str) -> None:
+          """Mutable operation on entity."""
+          self.email = new_email
+  ```
+
+- **One public class per file** (helpers/private classes allowed sparingly).
+- **Avoid globals/singletons**; use DI cho dependencies.
+- **No wildcard imports**, no `print` trong prod code, no mutable default args.
+- **Type hints everywhere:** Functions, methods, class attributes, variables.
 
 #### Formatting & Style
 - Line length ≤ **100**; 4‑space indentation; trailing commas where appropriate.
