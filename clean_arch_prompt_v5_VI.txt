@@ -248,9 +248,90 @@ Interface constants  → app/interfaces/constants/ (UI defaults)
 ============================================================================
 ## 4) TIÊU CHUẨN CODE & QUY ƯỚC (CÓ THỂ THỰC THI)
 
-### 4.1 🎯 Quick Reference - Naming Conventions (Tra Cứu Nhanh)
+### 4.1 🌟 LUẬT CHUNG (General Rules) - Áp dụng cho TẤT CẢ Layers
 
-**Sử dụng bảng này khi cần tra cứu nhanh cách đặt tên. Chi tiết đầy đủ ở sections sau.**
+#### 4.1.1 Nguyên Tắc Cơ Bản
+- **Immutability:** Tất cả data models PHẢI immutable để đảm bảo thread-safety và predictability
+- **Documentation:** Mỗi class/type PHẢI có docstring giải thích Purpose/Used by/Reason
+- **Type Annotations:** Đầy đủ type hints cho tất cả fields, không có implicit any/object types
+- **Layer Separation:** Không tái dùng types giữa các layers, mỗi layer có data models riêng
+- **ISO-8601:** Datetime format chuẩn tại tất cả boundaries (DTOs, external APIs)
+
+#### 4.1.2 Naming Patterns Chung
+- **Boolean fields:** `is_*`, `has_*`, `can_*`, `should_*`
+  - Ví dụ: `is_active`, `is_verified`, `has_location`, `can_retry`, `should_notify`
+- **Timestamp fields:** `*_at` (created_at, updated_at, deleted_at, occurred_at, expires_at)
+- **Date fields:** `*_date` (birth_date, start_date, end_date)
+- **ID fields:** `*_id` (user_id, order_id, transaction_id, correlation_id)
+- **Count fields:** `*_count`, `num_*`, `total_*` (item_count, num_items, total_orders)
+- **Status fields:** `*_status`, `*_state` (order_status, payment_status, workflow_state)
+- **URL fields:** `*_url`, `*_uri` (avatar_url, callback_url, webhook_uri)
+- **Money fields:** `*_amount`, `*_price` (usd_amount, price_amount, total_amount)
+
+#### 4.1.3 Cấu Trúc Chung
+- **Collections:** Prefer immutable (tuple, frozenset) thay vì mutable (list, set)
+- **Optional fields:** Sử dụng `| None` type hint, suffix `_optional` nếu cần làm rõ
+- **Versioning:** `V1`, `V2` trước suffix chính (UserResponseV2Dto, CreateUserCommandV1Dto)
+
+---
+
+### 4.2 🏗️ LUẬT RIÊNG (Layer-Specific Rules)
+
+#### 4.2.1 Domain Layer - Business Logic
+**Pattern:** `{Entity}`, `{ValueObject}`, `{Entity}Event`
+
+- **Entities:** `User`, `Order`, `Product` (danh từ số ít, CapWords, không hậu tố Model)
+- **Value Objects:** `Money`, `Email`, `Coordinates` (ý nghĩa giá trị, không ID kỹ thuật)
+- **Identity:** `{Entity}Id` → `UserId`, `OrderId`, `ProductId`
+- **Names:** `{Entity}Name` → `ProductName`, `CategoryName`, `CustomerName`
+- **Status:** `{Entity}Status` → `OrderStatus`, `UserStatus`, `PaymentStatus`
+- **Events:** `{Entity}Event` → `UserCreatedEvent`, `OrderPlacedEvent`, `PaymentProcessedEvent`
+
+#### 4.2.2 Application Layer - Use Cases & DTOs
+**Pattern:** `{Action}{Entity}`, `{Action}{Entity}{Type}Dto`
+
+- **Use Cases:** `CreateUser`, `UpdateOrder`, `GetProduct`, `PlanRoute`, `ProcessPayment`
+- **Repositories:** `{Entity}Repository` → `UserRepository`, `OrderRepository`
+- **Gateways:** `{Entity}Gateway` → `PaymentGateway`, `NotificationGateway`, `TrafficGateway`
+- **Command DTOs:** `{Action}{Entity}CommandDto` → `CreateUserCommandDto`, `UpdateOrderCommandDto`
+- **Query DTOs:** `{Action}{Entity}QueryDto` → `GetUserQueryDto`, `SearchOrdersQueryDto`
+- **Response DTOs:** `{Action}{Entity}ResponseDto` → `CreateUserResponseDto`, `UserResponseDto`
+- **Result DTOs:** `{Entity}ResultDto` → `ValidationResultDto`, `ProcessingResultDto`
+- **Event DTOs:** `{Entity}EventDto` → `UserCreatedEventDto`, `OrderPlacedEventDto`
+- **List DTOs:** `{Entity}ListResponseDto` → `UserListResponseDto`, `OrderListResponseDto`
+- **Paged DTOs:** `Paged{Entity}sResponseDto` → `PagedUsersResponseDto`, `PagedOrdersResponseDto`
+
+#### 4.2.3 Infrastructure Layer - External & Persistence
+**Pattern:** `{Provider}{Entity}{Type}`, `{Entity}Entity`
+
+- **Provider Requests:** `{Provider}{Entity}RequestDto` → `StripePaymentRequestDto`, `GoogleMapsRouteRequestDto`
+- **Provider Responses:** `{Provider}{Entity}ResponseDto` → `StripePaymentResponseDto`, `Auth0UserResponseDto`
+- **Provider Mappers:** `{Provider}{Entity}Mapper` → `StripePaymentMapper`, `GoogleMapsRouteMapper`
+- **Database Entities:** `{Entity}Entity` → `UserEntity`, `OrderEntity` (ưu tiên Entity)
+- **Link Entities:** `{Entity1}{Entity2}LinkEntity` → `UserOrderLinkEntity`, `ProductCategoryLinkEntity`
+- **Tech Repositories:** `{Entity}{Tech}Repository` → `UserSqlRepository`, `OrderPostgresRepository`
+
+#### 4.2.4 Interfaces Layer - UI Models (NO "Dto" suffix)
+**Pattern:** `{Entity}UiModel`, `{Feature}Ui{Type}`
+
+- **UI Models:** `{Entity}UiModel` → `UserUiModel`, `OrderUiModel`, `DashboardUiModel`
+- **UI State:** `{Feature}UiState` → `UserProfileUiState`, `OrderListUiState`, `LoginFormUiState`
+- **UI Events:** `{Feature}UiEvent` → `UserClickedSubmitEvent`, `OrderFilterChangedEvent`
+- **UI Effects:** `{Feature}UiEffect` → `ShowNotificationEffect`, `NavigateToPageEffect`
+- **Forms:** `{Feature}Form` → `LoginForm`, `CreateOrderForm`, `UserProfileForm`
+
+#### 4.2.5 Mappers - Data Conversion
+**Pattern:** `{Entity}Mapper`, `to{Target}()`
+
+- **Entity Mappers:** `{Entity}Mapper` → `UserMapper`, `OrderMapper`, `RouteTranslator`
+- **ACL Mappers:** `{Provider}{Entity}Mapper` → `StripePaymentMapper`, `GoogleMapsRouteMapper`
+- **Methods:** `to_domain()`, `to_dto()`, `to_entity()`, `to_ui_model()`, `to_command()`, `to_query()`
+
+---
+
+### 4.3 🎯 QUICK REFERENCE (Tra Cứu Nhanh)
+
+**Sử dụng bảng này khi cần tra cứu nhanh cách đặt tên. Chi tiết đầy đủ ở sections trên.**
 
 #### DOMAIN LAYER
 ```
@@ -327,7 +408,11 @@ is_*, has_*, can_*, should_*      → Boolean fields
 CreateUserCommandV1Dto            → Versioned command (V1)
 ```
 
-#### ⚠️ CRITICAL RULES (BẮT BUỘC)
+---
+
+### 4.4 ⚠️ CRITICAL RULES & CONSTRAINTS (BẮT BUỘC)
+
+#### 4.4.1 BẮT BUỘC (REQUIRED)
 ```
 ✅ ALWAYS immutable                → All DTOs, VOs, UI Models
 ✅ ALWAYS documentation            → Every DTO/UI Model must explain Purpose/Used by/Reason
@@ -336,7 +421,10 @@ CreateUserCommandV1Dto            → Versioned command (V1)
 ✅ ALWAYS separate layers          → No Entity as Dto, no cross-layer reuse
 ✅ ALWAYS ISO-8601                 → Datetime at all boundaries
 ✅ UI Models NO "Dto" suffix       → UserUiModel (NOT UserUiModelDto)
+```
 
+#### 4.4.2 NGHIÊM CẤM (FORBIDDEN)
+```
 ❌ NEVER Entity as Dto             → Separate types always
 ❌ NEVER mutable collections       → Use immutable/readonly collections
 ❌ NEVER skip immutability         → For DTOs/VOs/UI Models
@@ -345,208 +433,7 @@ CreateUserCommandV1Dto            → Versioned command (V1)
 ❌ NEVER "Dto" suffix for UI       → UI Models are view models, not DTOs
 ```
 
----
-
-### 4.2 Quy Tắc Đặt Tên Data Model - Chi Tiết (Detailed Rules)
-
-#### Domain Layer
-- **Domain entities (nghiệp vụ thuần):** đặt tên **danh từ số ít, CapWords**, không thêm hậu tố *Model*.
-  Ví dụ: `User`, `Order`, `RoutePlan`, `Money`, `Email`, `LatLon`.
-  
-- **Identity Objects:** hậu tố `Id`.
-  Ví dụ: `UserId`, `OrderId`, `ProductId`.
-  
-- **Value Objects:** CapWords, tên thể hiện ý nghĩa giá trị (không ID kỹ thuật).
-  - **Name objects:** hậu tố `Name` khi biểu thị tên nghiệp vụ.
-    Ví dụ: `ProductName`, `CategoryName`, `CustomerName`.
-  - **Value objects khác:** Tên thể hiện ý nghĩa.
-    Ví dụ: `Coordinates`, `Price`, `DistanceKm`, `EmailAddress`, `PhoneNumber`.
-  - **Value objects trong Application:** hậu tố `Value` khi cần phân biệt rõ.
-    Ví dụ: `UserValue`, `OrderValue`.
-    
-- **Domain Enums:** CapWords + danh từ/tính từ miêu tả trạng thái, hậu tố `Status` cho trạng thái.
-  Ví dụ: `OrderStatus`, `UserStatus`, `PaymentStatus`, `TravelMode`, `Priority`.
-
-- **Domain Events:** hậu tố `Event`.
-  Ví dụ: `UserCreatedEvent`, `OrderPlacedEvent`, `PaymentProcessedEvent`.
-
-#### Application Layer
-- **Repositories / Ports (interfaces):** **không tiền tố `I`**; tên dạng *NounRepository*/*NounGateway*.
-  Ví dụ: `UserRepository`, `OrderRepository`, `TrafficGateway`, `PaymentGateway`.
-  
-- **Use Cases:** *VerbNoun* (động từ + danh từ), thể hiện hành động nghiệp vụ.
-  Ví dụ: `CreateUser`, `UpdateOrder`, `PlanRoute`, `GetTrafficIncidents`, `ProcessPayment`.
-
-#### Application DTOs (Ports layer `application/dto/`)
-
-**⚠️ YÊU CẦU BẮT BUỘC CHO TẤT CẢ DTOs:**
-1. **Immutable structure:** Tất cả DTO PHẢI là immutable để đảm bảo thread-safety và predictability.
-2. **Documentation:** Mỗi DTO PHẢI có documentation giải thích:
-   - Mục đích/trách nhiệm của DTO
-   - Lý do tạo ra DTO này (use case nào sử dụng, tại sao cần tách biệt)
-   - Layer/boundary nào sử dụng
-3. **Type annotations:** Tất cả fields PHẢI có type annotation đầy đủ.
-
-**Naming Patterns:**
-
-- **Command DTO (Input cho Use Case thay đổi state):** `{Action}{Entity}CommandDto`
-  Ví dụ: `CreateUserCommandDto`, `UpdateOrderCommandDto`, `DeleteProductCommandDto`.
-  - Purpose: Encapsulates data required for state-changing operations
-  - Used by: Use cases at Application layer boundary
-  - Fields: Immutable with full type annotations
-
-- **Query DTO (Input cho Use Case chỉ đọc):** `{Action}{Entity}QueryDto`
-  Ví dụ: `GetUserQueryDto`, `SearchOrdersQueryDto`, `ListProductsQueryDto`.
-  - Purpose: Encapsulates search/filter criteria
-  - Supports: Optional filters, pagination, sorting
-  - Fields: Immutable with default values for optional parameters
-
-- **Response DTO (Output từ Use Case):** `{Action}{Entity}ResponseDto` hoặc `{Entity}ResponseDto`
-  Ví dụ: `CreateUserResponseDto`, `UserResponseDto`, `OrderResponseDto`, `PagedOrdersResponseDto`.
-  - Purpose: Returns data to presentation layer
-  - Controls: API contract, prevents entity exposure
-  - Fields: Immutable, ISO-8601 for dates
-
-- **Result DTO (Intermediate results giữa các tầng):** `{Entity}ResultDto`
-  Ví dụ: `UserResultDto`, `OrderResultDto`, `ValidationResultDto`.
-  - Purpose: Carries operation results between components
-  - Used by: Validation workflows, processing pipelines
-  - Fields: Immutable result data with success/error indicators
-
-- **Event DTO (Domain events serialized):** `{Entity}EventDto`
-  Ví dụ: `UserCreatedEventDto`, `OrderPlacedEventDto`.
-  - Purpose: Serialized representation of domain events
-  - Used by: Event bus, message queue, event sourcing
-  - Fields: Immutable event data with metadata (event_id, occurred_at)
-
-- **Versioning:** chèn `V1`, `V2` **trước** hậu tố `Dto`.
-  Ví dụ: `CreateUserCommandV2Dto`, `UserResponseV1Dto`.
-
-- **Wrapper số nhiều / phân trang:**
-  - Danh sách: `{Entity}ListResponseDto` hoặc `{Entity}sResponseDto`
-    Ví dụ: `UserListResponseDto`, `OrdersResponseDto`.
-  - Phân trang: `Paged{Entity}sResponseDto`
-    Ví dụ: `PagedUsersResponseDto`, `PagedOrdersResponseDto`.
-  - Fields: items (immutable collection), page, page_size, total, has_next
-
-- **Trường trong DTO:** 
-  - Bám sát schema provider (giữ naming convention phù hợp)
-  - Domain sẽ map sang convention riêng khi cần
-  - Prefer immutable collections (readonly arrays, immutable lists)
-
-#### Infrastructure Layer
-
-- **External Provider Request DTO:** `{Provider}{Entity}RequestDto`
-  Ví dụ: `GoogleMapsRouteRequestDto`, `StripePaymentRequestDto`, `Auth0UserRequestDto`.
-  - Purpose: Encapsulates data for external API calls
-  - Used by: Provider gateway adapters in Infrastructure layer
-  - Reason: Isolates external API schema from domain
-
-- **External Provider Response DTO:** `{Provider}{Entity}ResponseDto`
-  Ví dụ: `GoogleMapsRouteResponseDto`, `StripePaymentResponseDto`, `Auth0UserResponseDto`.
-  - Purpose: Captures external API response data
-  - Used by: Provider gateway adapters, ACL mappers
-  - Reason: Maps external responses to internal types via ACL
-
-- **Database Models:** `{Database}{Entity}ModelDto` hoặc `{Entity}Entity` (ưu tiên `Entity`)
-  Ví dụ: `UserEntity`, `OrderEntity`, `PostgresUserModelDto` (nếu cần phân biệt DB).
-  - Purpose: ORM/persistence models for database tables
-  - Used by: Repository implementations in Infrastructure layer
-  - Reason: Separates persistence schema from domain model
-
-- **Bảng nối/khóa tổng hợp:** `{Entity1}{Entity2}LinkEntity`, `{Entity1}{Entity2}CrossRefEntity`.
-  Ví dụ: `UserOrderLinkEntity`, `ProductCategoryLinkEntity`.
-
-- **DAO/Repositories cụ thể hạ tầng:** `{Entity}{Technology}Repository` hoặc `{Entity}Dao`.
-  Ví dụ: `UserSqlRepository`, `OrderPostgresRepository`, `ProductDao`.
-
-#### Interfaces Layer (UI-facing Models)
-
-**⚠️ YÊU CẦU BẮT BUỘC CHO UI MODELS:**
-1. **Immutable structure:** Tất cả UI model PHẢI là immutable.
-2. **Documentation:** Mỗi UI model PHẢI giải thích mục đích hiển thị.
-3. **Type annotations:** Đầy đủ type annotation.
-4. **KHÔNG dùng hậu tố Dto:** UI models là view models/presentation models, không phải DTOs.
-
-- **UI Model (Presentation data):** `{Entity}UiModel`
-  Ví dụ: `UserUiModel`, `OrderUiModel`, `DashboardUiModel`.
-  - Purpose: Optimized data format for UI rendering
-  - Fields: Pre-formatted strings, human-readable values, UI-relevant only
-  - Reason: Includes only display fields, omits sensitive data
-
-- **UI State (Component state):** `{Feature}UiState`
-  Ví dụ: `UserProfileUiState`, `OrderListUiState`, `LoginFormUiState`.
-  - Purpose: Manages component view state
-  - Fields: Data collections, loading flags, filter/pagination state
-  - Reason: Centralizes UI state management
-
-- **UI Event (User actions):** `{Feature}UiEvent`
-  Ví dụ: `UserClickedSubmitEvent`, `OrderFilterChangedEvent`.
-  - Purpose: Captures user interactions
-  - Fields: Event type, payload data, timestamp
-  - Reason: Type-safe event payloads for state updates
-
-- **UI Effect (Side effects):** `{Feature}UiEffect`
-  Ví dụ: `ShowNotificationEffect`, `NavigateToPageEffect`, `ScrollToTopEffect`.
-  - Purpose: Declarative side effect instructions
-  - Fields: Effect type, parameters, duration/options
-  - Reason: Decouples business logic from UI side effects
-
-- **Form Model (Form input/validation):** `{Feature}Form`
-  Ví dụ: `LoginForm`, `CreateOrderForm`, `UserProfileForm`.
-  - Purpose: Captures and validates form input
-  - Fields: Form input fields with validation rules
-  - Reason: Client-side validation before backend submission
-
-#### Mapper/Translator Naming
-- **Methods:** `toDomain()`, `toDto()`, `toEntity()`, `toUiModel()`, `toCommand()`, `toQuery()`
-  - Purpose: Convert between layer types
-  - Pattern: Explicit conversion method names
-  - Example: User entity ↔ UserResponseDto ↔ UserUiModel
-  
-- **Classes:** `{Entity}Mapper`, `{Entity}Translator`
-  Ví dụ: `UserMapper`, `OrderMapper`, `RouteTranslator`
-  - Purpose: Centralize mapping logic for entities
-  - Contains: All conversion methods for one entity type
-  
-- **ACL Mappers (Anti-Corruption Layer):** `{Provider}{Entity}Mapper`.
-  Ví dụ: `StripePaymentMapper`, `GoogleMapsRouteMapper`, `Auth0UserMapper`.
-  
-- **Không** chứa logic nghiệp vụ trong mapper; chỉ chuyển đổi dữ liệu và normalizing nhẹ.
-
-#### Quy Tắc Đặt Tên Đặc Biệt
-
-- **Boolean fields:** prefix `is_*`, `has_*`, `can_*`, `should_*`.
-  Ví dụ: `is_active`, `is_verified`, `has_location`, `has_premium`, `can_retry`, `should_notify`.
-
-- **Datetime/timestamp fields:** suffix `_at` cho timestamp, `_date` cho date-only.
-  - Timestamp: `created_at`, `updated_at`, `deleted_at`, `occurred_at`, `expires_at`.
-  - Date: `birth_date`, `start_date`, `end_date`.
-  - **Format:** ISO-8601 tại tất cả boundaries (DTOs, external APIs).
-  
-- **Count/quantity fields:** prefix `num_*` hoặc `total_*`, suffix `_count`.
-  Ví dụ: `num_items`, `total_orders`, `item_count`, `page_count`.
-
-- **Status/state fields:** suffix `_status` hoặc `_state`.
-  Ví dụ: `order_status`, `payment_status`, `workflow_state`, `connection_state`.
-
-- **ID fields:** suffix `_id` cho string IDs.
-  Ví dụ: `user_id`, `order_id`, `transaction_id`, `correlation_id`.
-
-- **List/collection fields trong DTOs:** 
-  - Prefer `tuple` cho immutability: `items: tuple[UserDto, ...]`
-  - Nếu cần list semantics: `user_list`, `order_items`, `product_ids`.
-
-- **Optional/nullable fields:** Sử dụng `| None` type hint, suffix `_optional` nếu cần làm rõ.
-  Ví dụ: `middle_name: str | None`, `discount_code: str | None`.
-
-- **URL/URI fields:** suffix `_url` hoặc `_uri`.
-  Ví dụ: `avatar_url`, `callback_url`, `webhook_uri`, `resource_uri`.
-
-- **Money/currency fields:** prefix với currency hoặc suffix `_amount`.
-  Ví dụ: `usd_amount`, `price_amount`, `total_amount`, `discount_amount`.
-
-#### Ràng Buộc Kiến Trúc (Architecture Constraints)
+#### 4.4.3 Ràng Buộc Kiến Trúc (Architecture Constraints)
 
 **🚫 NGHIÊM CẤM (FORBIDDEN):**
 
@@ -633,7 +520,91 @@ CreateUserCommandV1Dto            → Versioned command (V1)
 
 ---
 
-### 4.3 Ví Dụ Thực Tế (Essential Examples Only)
+### 4.5 📋 Tiêu Chuẩn Code Chung
+
+#### Language & Type Safety
+- **Modern statically-typed language** (e.g., TypeScript, Java, C#, Kotlin, Rust, Go, Swift)
+- **Full type annotations** cho tất cả code
+- **BẮT BUỘC IMMUTABLE data structures** cho:
+  - Tất cả DTOs (Command, Query, Response, Result, Event) - Application/Infrastructure
+  - Tất cả Value Objects trong Domain
+  - Tất cả UI Models (UiModel, UiState, UiEvent, UiEffect, Form) - Interfaces layer
+  - Bất kỳ data structure nào cross boundaries giữa các layers
+  
+  ```typescript
+  // ✅ CORRECT - Immutable DTOs (TypeScript)
+  interface CreateUserCommandDto {
+      readonly name: string;
+      readonly email: string;
+  }
+  
+  interface Money {
+      readonly amount: number;
+      readonly currency: string;
+  }
+  
+  interface UserUiModel {
+      readonly displayName: string;
+      readonly email: string;
+  }
+  ```
+  
+  ```java
+  // ✅ CORRECT - Immutable DTOs (Java with records)
+  public record CreateUserCommandDto(String name, String email) {}
+  public record Money(BigDecimal amount, String currency) {}
+  public record UserUiModel(String displayName, String email) {}
+  ```
+  
+- **KHÔNG BẮT BUỘC immutability** cho:
+  - Domain Entities (có thể mutable nếu business logic yêu cầu)
+  - Internal helpers/builders (không cross boundaries)
+  
+  ```typescript
+  // ✅ OK - Entity có thể mutable
+  class User {
+      private id: UserId;
+      private name: string;
+      private email: string;
+      
+      updateEmail(newEmail: string): void {
+          this.email = newEmail;
+      }
+  }
+  ```
+
+- **One public class per file** (helpers/private classes allowed sparingly).
+- **Avoid globals/singletons**; use DI cho dependencies.
+- **No wildcard imports**, no debug statements trong prod code.
+- **Type annotations everywhere:** Functions, methods, class attributes, variables.
+
+#### Formatting & Style
+- Line length ≤ **100**; 4‑space indentation; trailing commas where appropriate.
+- Naming: `CapWords` classes, `snake_case` functions/vars, `UPPER_SNAKE` constants.
+- Public APIs require **docstrings** (Google/NumPy style).
+- Use **Ruff** as linter **and** formatter (`ruff format`). If Black is required, disable Ruff formatter và use Black for format + Ruff for lint.
+
+#### Giới Hạn Function/Method
+- ≤ **50 LOC** per function (excl. docstring/blank lines).
+- ≤ **6 parameters** (incl. `self`); prefer DTOs cho complex inputs.
+- ≤ **3 return points** (guard‑clauses allowed). Nesting depth ≤ **3**.
+- Cyclomatic complexity ≤ **10**; Cognitive complexity ≤ **15**.
+
+#### Giới Hạn Class/Module
+- ≤ **400 LOC** per class, ≤ **600 LOC** per module.
+- Prefer composition over inheritance; no deep hierarchies (>2).
+
+#### Xử Lý Lỗi
+- No bare `except:`. Raise project‑specific errors (Domain/Application/Infra).
+- Structured logging via wrapper; correlation/request IDs; never log secrets/PII.
+
+#### Security & DRY
+- Validate/normalize inputs tại interface boundary. Secrets read only trong infra/config.
+- No duplication. Extract helpers và reuse DTOs. Prefer explicit, readable code.
+
+---
+
+### 4.6 📋 EXAMPLES & PATTERNS (Ví Dụ Thực Tế)
 
 **Example 1: Command DTO với đầy đủ documentation**
 ```typescript
@@ -788,89 +759,6 @@ public record StripePaymentRequestDto(
 > 💡 **Lưu ý**: Tham khảo thêm các ví dụ khác (Query DTO, Response DTO, UI Model, Event DTO) 
 > trong documentation hoặc examples repository khi cần.
 
----
-
-### 4.4 Tiêu Chuẩn Code Chung
-
-#### Language & Type Safety
-- **Modern statically-typed language** (e.g., TypeScript, Java, C#, Kotlin, Rust, Go, Swift)
-- **Full type annotations** cho tất cả code
-- **BẮT BUỘC IMMUTABLE data structures** cho:
-  - Tất cả DTOs (Command, Query, Response, Result, Event) - Application/Infrastructure
-  - Tất cả Value Objects trong Domain
-  - Tất cả UI Models (UiModel, UiState, UiEvent, UiEffect, Form) - Interfaces layer
-  - Bất kỳ data structure nào cross boundaries giữa các layers
-  
-  ```typescript
-  // ✅ CORRECT - Immutable DTOs (TypeScript)
-  interface CreateUserCommandDto {
-      readonly name: string;
-      readonly email: string;
-  }
-  
-  interface Money {
-      readonly amount: number;
-      readonly currency: string;
-  }
-  
-  interface UserUiModel {
-      readonly displayName: string;
-      readonly email: string;
-  }
-  ```
-  
-  ```java
-  // ✅ CORRECT - Immutable DTOs (Java with records)
-  public record CreateUserCommandDto(String name, String email) {}
-  public record Money(BigDecimal amount, String currency) {}
-  public record UserUiModel(String displayName, String email) {}
-  ```
-  
-- **KHÔNG BẮT BUỘC immutability** cho:
-  - Domain Entities (có thể mutable nếu business logic yêu cầu)
-  - Internal helpers/builders (không cross boundaries)
-  
-  ```typescript
-  // ✅ OK - Entity có thể mutable
-  class User {
-      private id: UserId;
-      private name: string;
-      private email: string;
-      
-      updateEmail(newEmail: string): void {
-          this.email = newEmail;
-      }
-  }
-  ```
-
-- **One public class per file** (helpers/private classes allowed sparingly).
-- **Avoid globals/singletons**; use DI cho dependencies.
-- **No wildcard imports**, no debug statements trong prod code.
-- **Type annotations everywhere:** Functions, methods, class attributes, variables.
-
-#### Formatting & Style
-- Line length ≤ **100**; 4‑space indentation; trailing commas where appropriate.
-- Naming: `CapWords` classes, `snake_case` functions/vars, `UPPER_SNAKE` constants.
-- Public APIs require **docstrings** (Google/NumPy style).
-- Use **Ruff** as linter **and** formatter (`ruff format`). If Black is required, disable Ruff formatter và use Black for format + Ruff for lint.
-
-#### Giới Hạn Function/Method
-- ≤ **50 LOC** per function (excl. docstring/blank lines).
-- ≤ **6 parameters** (incl. `self`); prefer DTOs cho complex inputs.
-- ≤ **3 return points** (guard‑clauses allowed). Nesting depth ≤ **3**.
-- Cyclomatic complexity ≤ **10**; Cognitive complexity ≤ **15**.
-
-#### Giới Hạn Class/Module
-- ≤ **400 LOC** per class, ≤ **600 LOC** per module.
-- Prefer composition over inheritance; no deep hierarchies (>2).
-
-#### Xử Lý Lỗi
-- No bare `except:`. Raise project‑specific errors (Domain/Application/Infra).
-- Structured logging via wrapper; correlation/request IDs; never log secrets/PII.
-
-#### Security & DRY
-- Validate/normalize inputs tại interface boundary. Secrets read only trong infra/config.
-- No duplication. Extract helpers và reuse DTOs. Prefer explicit, readable code.
 
 ============================================================================
 ## 5) XỬ LÝ LỖI & CONSTANTS
