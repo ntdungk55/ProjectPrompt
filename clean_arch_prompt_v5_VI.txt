@@ -222,7 +222,11 @@ scripts/                            # 🛠️ UTILITY SCRIPTS
 
 #### 3.4.1 File Organization
 - **One public class per file** (private helpers allowed)
-- **File name = class name** (snake_case)
+- **File naming convention**:
+  - **Python**: `snake_case.py` (e.g., `user_service.py` for `UserService` class)
+  - **Java**: `PascalCase.java` (e.g., `UserService.java` for `UserService` class)
+  - **C#**: `PascalCase.cs` (e.g., `UserService.cs` for `UserService` class)
+  - **TypeScript**: `PascalCase.ts` (e.g., `UserService.ts` for `UserService` class)
 - **Module structure mirrors responsibility**
 
 #### 3.4.2 Import Rules
@@ -580,9 +584,17 @@ CreateUserCommandV1Dto            → Versioned command (V1)
 
 #### Formatting & Style
 - Line length ≤ **100**; 4‑space indentation; trailing commas where appropriate.
-- Naming: `CapWords` classes, `snake_case` functions/vars, `UPPER_SNAKE` constants.
-- Public APIs require **docstrings** (Google/NumPy style).
-- Use **Ruff** as linter **and** formatter (`ruff format`). If Black is required, disable Ruff formatter và use Black for format + Ruff for lint.
+- **Naming conventions** (language-specific):
+  - **Python**: `CapWords` classes, `snake_case` functions/vars, `UPPER_SNAKE` constants
+  - **Java**: `PascalCase` classes, `camelCase` methods/vars, `UPPER_SNAKE` constants
+  - **C#**: `PascalCase` classes, `PascalCase` methods, `camelCase` vars, `UPPER_SNAKE` constants
+  - **TypeScript**: `PascalCase` classes, `camelCase` functions/vars, `UPPER_SNAKE` constants
+- Public APIs require **docstrings** (language-specific style).
+- Use **language-specific linters**:
+  - **Python**: Ruff (lint+format), mypy (type checking)
+  - **Java**: Checkstyle, SpotBugs, PMD
+  - **C#**: StyleCop, SonarQube, Roslyn analyzers
+  - **TypeScript**: ESLint, Prettier, TypeScript compiler
 
 #### Giới Hạn Function/Method
 - ≤ **50 LOC** per function (excl. docstring/blank lines).
@@ -607,6 +619,10 @@ CreateUserCommandV1Dto            → Versioned command (V1)
 ### 4.6 📋 EXAMPLES & PATTERNS (Ví Dụ Thực Tế)
 
 **Example 1: Command DTO với đầy đủ documentation**
+
+> 💡 **Language-Agnostic Examples**: Các ví dụ dưới đây sử dụng TypeScript, Java, C# syntax.
+> Áp dụng patterns tương tự cho ngôn ngữ của bạn với syntax phù hợp.
+
 ```typescript
 // File: app/application/dto/CreateUserCommandDto.ts
 export interface CreateUserCommandDto {
@@ -966,104 +982,39 @@ Hỗ trợ **type safety** và **validation** cho tất cả constants.
 - **Testing**: Test constants để đảm bảo tính chính xác
 - **Environment awareness**: Hỗ trợ different values cho different environments
 
-### 5.5 Global Constants Architecture (Kiến Trúc Constants Toàn Cục)
+### 5.5 Constants Best Practices & Usage Rules
 
-Tạo **Global Constant Class** chứa tất cả constants dùng chung across layers.
-Tách biệt **string constants** không phải input/output vào constant layer.
-Đảm bảo **single source of truth** cho toàn bộ application.
-Hỗ trợ **centralized configuration management**.
-
-#### Global Constants Structure
-```
-app/
-  constants/                    # Global constants layer
-    __init__.py
-    global_constants.py         # Main global constants class
-    business_constants.py      # Business-specific constants
-    technical_constants.py     # Technical constants
-    ui_constants.py           # UI-specific constants
-    validation_constants.py   # Validation constants
-    error_constants.py       # Error constants
-    config_constants.py      # Configuration constants
-```
-
-#### 5.5.1 Global Constants Class
-
-**Structure:**
-- Business constants: MAX_ORDER_ITEMS, MIN_ORDER_AMOUNT, DEFAULT_TAX_RATE
-- Technical constants: DEFAULT_POOL_SIZE, CONNECTION_TIMEOUT, DEFAULT_TTL
-- API constants: DEFAULT_PAGE_SIZE, SUPPORTED_VERSIONS, CURRENT_VERSION
-- Feature flags: ENABLE_EMAIL_VERIFICATION, ENABLE_DEBUG_MODE
-
-**Implementation:** Use language-specific patterns (TypeScript class, Java static final, C# const)
-
-#### 5.5.2 Domain-Specific Constants Examples
-
-**Business Constants** (domain/constants/)
-- Order statuses, payment methods, currencies
-- Business rules and state transitions
-- Domain-specific validation rules
-
-**Technical Constants** (infrastructure/constants/)
-- Database configurations, cache keys
-- Logging levels, rate limits
-- Connection pools, timeouts
-
-**UI Constants** (interfaces/constants/)
-- Display formats (date, currency)
-- Pagination defaults
-- UI messages and labels
-
-> 💡 **Note**: Implement constants using your language's preferred pattern:
-> - TypeScript: `const` or `enum`
-> - Java: `static final` or `enum`
-> - C#: `const` or `static readonly`
-> - Rust: `const` or `static`
-
-#### 5.5.3 Constants Best Practices
-
-1. **Single Source of Truth**: Define each constant once
-2. **Type Safety**: Use language's type system
-3. **Immutability**: Prefer immutable/readonly constants
-4. **Naming**: UPPER_SNAKE_CASE for constants
-5. **Grouping**: Group related constants in classes/modules
-6. **Documentation**: Document purpose and usage
-7. **Environment Override**: Allow runtime override via ENV
-
-#### 5.5.4 Constants Loading Precedence
-
+#### 5.5.1 Constants Loading Precedence
 ```
 1. ENV variables (highest priority)
-2. Runtime config
+2. Runtime config  
 3. Constants files (default fallback)
 ```
 
 > ⚠️ Constants are **defaults only**. Always support override via configuration.
 
----
+#### 5.5.2 Import Patterns
+- **Domain layer**: Only domain constants
+- **Application layer**: Application + domain constants  
+- **Infrastructure layer**: Infrastructure + application + domain constants
+- **Interfaces layer**: UI constants + application constants
 
-### 5.6 Constants Import & Usage Rules
+#### 5.5.3 Best Practices
+- **Single Source of Truth**: Define each constant once
+- **Type Safety**: Use language's type system
+- **Immutability**: Prefer immutable/readonly constants
+- **Naming**: UPPER_SNAKE_CASE for constants
+- **Grouping**: Group related constants in classes/modules
+- **Documentation**: Document purpose and usage
+- **Environment Override**: Allow runtime override via ENV
 
-**Import Patterns:**
-- Domain layer: Only domain constants
-- Application layer: Application + domain constants
-- Infrastructure layer: Infrastructure + application + domain constants
-- Interfaces layer: UI constants + application constants
-
-**Best Practices:**
-- Single global instance per constants class
-- Immutable constants (readonly/const)
-- Type safety with full annotations
-- Centralized management in one location
-- Layer separation by responsibility
-- No hardcoding values in logic
-- Environment-aware values
-
-**Example Use Cases:**
-- Regex patterns for validation (email, phone, password)
-- Error codes and messages
-- Business rules and state transitions
-- Feature flags and configuration
+#### 5.5.4 Language-Specific Implementation
+> 💡 **Note**: Implement constants using your language's preferred pattern:
+> - **TypeScript**: `const` or `enum`
+> - **Java**: `static final` or `enum`  
+> - **C#**: `const` or `static readonly`
+> - **Python**: `UPPER_SNAKE_CASE` variables or `Enum`
+> - **Rust**: `const` or `static`
 
 ============================================================================
 ## 6) YÊU CẦU PHI CHỨC NĂNG
@@ -1210,119 +1161,43 @@ app/
 ============================================================================
 ## 7) TESTING & CHẤT LƯỢNG (CUNG CẤP STUBS)
 
-### 7.1 Test Structure & Organization
-- Unit tests: Test individual components in isolation
-- Integration tests: Test component interactions
-- End-to-end tests: Test complete user workflows
-- Use language-specific testing frameworks
+### 7.1 Testing Strategy & Pyramid
+- **Test Pyramid**: 70% unit tests, 20% integration tests, 10% E2E tests
+- **TDD/BDD**: Test-driven development for critical logic, BDD for user features
+- **Language-specific frameworks**:
+  - **Python**: pytest, unittest, hypothesis
+  - **Java**: JUnit, TestNG, Mockito
+  - **C#**: xUnit, NUnit, Moq
+  - **TypeScript**: Jest, Vitest, Playwright
 
-### 7.2 Testing Strategy
-- Test pyramid: More unit tests, fewer integration tests, minimal E2E tests
-- Test-driven development (TDD) for critical business logic
-- Behavior-driven development (BDD) for user-facing features
-- Use language-specific testing patterns
+### 7.2 Test Organization & Structure
+- **Unit tests**: Test individual components in isolation
+- **Integration tests**: Test component interactions
+- **End-to-end tests**: Test complete user workflows
+- **Test data**: Use fixtures/factories, isolate from production data
 
-### 7.3 Test Data Management
-- Use test fixtures and factories for data creation
-- Isolate test data from production data
-- Use language-specific test data management tools
-- Clean up test data after each test
+### 7.3 Quality Metrics & Coverage
+- **Coverage targets**: 80% line coverage, 70% branch coverage
+- **Quality gates**: All tests pass, coverage thresholds met, no critical bugs
+- **Language-specific tools**:
+  - **Python**: coverage.py, pytest-cov
+  - **Java**: JaCoCo, Cobertura
+  - **C#**: Coverlet, dotCover
+  - **TypeScript**: c8, nyc
 
-### 7.4 Quality Metrics & Coverage
-- Code coverage: Minimum 80% line coverage
-- Branch coverage: Minimum 70% branch coverage
-- Use language-specific coverage tools
-- Monitor coverage trends over time
+### 7.4 Testing Best Practices
+- **Test independence**: Tests must be isolated and independent
+- **Descriptive names**: Test names explain the scenario clearly
+- **AAA Pattern**: Arrange-Act-Assert structure
+- **Cleanup**: Clean up test data after each test
+- **Mocking**: Use appropriate mocking for external dependencies
 
-### 7.5 Test Tools & Configuration
-- Use language-specific testing frameworks
-- Configure test runners and reporters
-- Set up continuous integration for automated testing
-- Use language-specific mocking and stubbing libraries
-
-### 7.6 Quality Gates
-- All tests must pass before deployment
-- Coverage thresholds must be met
-- No critical bugs in test results
-- Performance tests must meet SLA requirements
-
-### 7.7 Automated Testing Methods
-- Unit testing: Test individual functions and methods
-- Integration testing: Test component interactions
-- End-to-end testing: Test complete user workflows
-- Performance testing: Test system performance under load
-- Security testing: Test for security vulnerabilities
-
-### 7.8 Test Automation Tools & Setup
-- Use language-specific testing frameworks
-- Set up continuous integration pipelines
-- Configure test reporting and notifications
-- Use language-specific test data management tools
-
-### 7.9 Automated Testing Best Practices
-- Write tests that are independent and isolated
-- Use descriptive test names that explain the scenario
-- Follow the Arrange-Act-Assert pattern
-- Use language-specific testing patterns and conventions
-
-### 7.10 Additional Testing Types
-- Black box testing: Test without knowing implementation
-- White box testing: Test with knowledge of implementation
-- Gray box testing: Combine black and white box approaches
-- Boundary value testing: Test edge cases and boundaries
-- Equivalence partitioning: Test representative values from each partition
-- Decision table testing: Test all combinations of conditions
-- State transition testing: Test state changes and transitions
-- Error guessing: Test common error scenarios
-- Exploratory testing: Unscripted testing based on exploration
-- Mutation testing: Test quality by introducing small changes
-
-### 7.11 Testing Pyramid
-- Unit tests: 70% of all tests
-- Integration tests: 20% of all tests
-- End-to-end tests: 10% of all tests
-- Use language-specific testing frameworks for each level
-
-### 7.12 Testing Strategy Matrix
-- Map test types to system components
-- Define testing responsibilities for each team
-- Establish testing standards and guidelines
-- Use language-specific testing tools and frameworks
-
-### 7.13 Automated Test Execution Strategy
-- Run unit tests on every code change
-- Run integration tests on pull requests
-- Run end-to-end tests on main branch
-- Use language-specific CI/CD tools for test execution
-
-### 7.14 Missing Testing Types
-- Additional testing types as needed for specific requirements
-- Use language-specific testing frameworks and tools
-- Follow testing best practices for each type
-
-### 7.15 Testing Tools & Frameworks
-- Use language-specific testing frameworks
-- Configure test runners and reporters
-- Set up continuous integration for automated testing
-- Use language-specific mocking and stubbing libraries
-
-### 7.16 Testing Metrics & KPIs
-- Code coverage metrics and trends
-- Test execution time and performance
-- Bug detection and resolution metrics
-- Use language-specific testing metrics tools
-
-### 7.17 Testing Rules & Standards
-- Follow language-specific testing conventions
-- Maintain consistent test structure and organization
-- Use descriptive test names and documentation
-- Follow testing best practices and patterns
-
-### 7.18 Testing Standards & Best Practices
-- Write maintainable and readable tests
-- Use appropriate testing patterns for each scenario
-- Follow language-specific testing conventions
-- Maintain high test quality and coverage standards
+### 7.5 Additional Testing Types
+- **Performance testing**: Load, stress, and scalability testing
+- **Security testing**: Vulnerability and penetration testing
+- **Boundary testing**: Edge cases and boundary conditions
+- **Mutation testing**: Test quality by introducing small changes
+- **Exploratory testing**: Unscripted testing based on exploration
 
 ============================================================================
 ## 8) QUY TẮC BẮT BUỘC TẠO TEST (MANDATORY TEST CREATION RULES)
@@ -1499,22 +1374,108 @@ app/interfaces/cli/user_cli.py → tests/interfaces/test_user_cli.py
 ============================================================================
 ## 10) TOOLING & CẤU HÌNH
 
-### 10.1 Core Tooling (Python)
-> **🐍 PYTHON TOOLING**: Các tooling được liệt kê dưới đây dành cho **Python ecosystem**.
-> Khi áp dụng cho ngôn ngữ khác, hãy chuyển đổi sang tooling tương ứng:
-> - Java: Maven/Gradle, Checkstyle, SpotBugs, JUnit
-> - C#: .NET CLI, StyleCop, SonarQube, xUnit
-> - TypeScript: ESLint, Prettier, Jest, TypeScript compiler
+### 10.1 Core Tooling (Language-Agnostic)
+> **🌐 LANGUAGE-AGNOSTIC TOOLING**: Các tooling được liệt kê dưới đây áp dụng cho **mọi ngôn ngữ hiện đại**.
+> Mỗi ngôn ngữ có ecosystem tương ứng:
 
+#### 10.1.1 Python Ecosystem
 - `pyproject.toml`: ruff (lint+format), black (optional), mypy (strict), pytest, hypothesis.
 - `.pre-commit-config.yaml`: ruff, ruff‑format or black, mypy, import‑linter, bandit, pip‑audit.
 - `architecture.ini`: layered imports (domain; application; infrastructure; interfaces) + forbidden cross‑layer edges.
-- `.env.example` và quick‑start instructions.
+
+#### 10.1.2 Java Ecosystem  
+- `pom.xml` or `build.gradle`: Maven/Gradle, Checkstyle, SpotBugs, JUnit, ArchUnit.
+- `.pre-commit-config.yaml`: checkstyle, spotbugs, jacoco, dependency-check.
+- `archunit.properties`: layered architecture rules + forbidden dependencies.
+
+#### 10.1.3 C# Ecosystem
+- `.csproj` or `Directory.Build.props`: .NET CLI, StyleCop, SonarQube, xUnit, NetArchTest.
+- `.pre-commit-config.yaml`: dotnet-format, security-scan, dependency-check.
+- `Architecture.ruleset`: layered architecture constraints.
+
+#### 10.1.4 TypeScript/JavaScript Ecosystem
+- `package.json`: ESLint, Prettier, Jest, TypeScript compiler, dependency-cruiser.
+- `.pre-commit-config.yaml`: eslint, prettier, jest, dependency-cruiser.
+- `dependency-cruiser.js`: layered architecture rules.
+
+#### 10.1.5 Common Configuration
+- `.env.example` và quick‑start instructions cho mọi ngôn ngữ.
+- `architecture.ini` hoặc equivalent: layered imports + forbidden cross‑layer edges.
 
 ### 10.2 AI‑Friendly Conventions
-- Nếu provided `ai_conventions.yaml`, nó là single source of truth cho rules và gates.
-- Include rule IDs (ví dụ: R‑LEN‑001, R‑CMP‑010), thresholds, examples, và mapping to tooling (ruff/mypy/import‑linter/xenon).
+- Nếu provided `ai_conventions.yaml` (hoặc equivalent cho ngôn ngữ khác), nó là single source of truth cho rules và gates.
+- Include rule IDs (ví dụ: R‑LEN‑001, R‑CMP‑010), thresholds, examples, và mapping to tooling:
+  - **Python**: ruff/mypy/import‑linter/xenon
+  - **Java**: checkstyle/spotbugs/archunit/jacoco  
+  - **C#**: stylecop/sonarqube/netarchtest/coverlet
+  - **TypeScript**: eslint/typescript/dependency-cruiser/jest
 - AI phải read file này và perform **Self‑Check** before returning code.
+
+#### 10.2.1 AI Conventions Template
+```yaml
+# ai_conventions.yaml - AI Development Rules
+rules:
+  # Code Quality Rules
+  R-LEN-001:
+    name: "Line Length"
+    severity: "must"
+    threshold: 100
+    tool: "ruff"
+    description: "Maximum line length in characters"
+    
+  R-CMP-010:
+    name: "Cyclomatic Complexity"
+    severity: "must"
+    threshold: 10
+    tool: "xenon"
+    description: "Maximum cyclomatic complexity per function"
+    
+  R-RET-003:
+    name: "Return Points"
+    severity: "must"
+    threshold: 3
+    tool: "custom"
+    description: "Maximum return points per function"
+    
+  # Architecture Rules
+  R-LAY-ARCH-100:
+    name: "Layer Boundaries"
+    severity: "must"
+    tool: "import-linter"
+    description: "Respect Clean Architecture layer boundaries"
+    
+  R-VENDOR-001:
+    name: "Vendor Isolation"
+    severity: "must"
+    tool: "custom"
+    description: "No vendor types beyond infrastructure layer"
+
+# Language-specific tooling
+tooling:
+  python:
+    linter: "ruff"
+    formatter: "ruff"
+    type_checker: "mypy"
+    architecture: "import-linter"
+    
+  java:
+    linter: "checkstyle"
+    formatter: "google-java-format"
+    type_checker: "javac"
+    architecture: "archunit"
+    
+  csharp:
+    linter: "stylecop"
+    formatter: "dotnet-format"
+    type_checker: "roslyn"
+    architecture: "netarchtest"
+    
+  typescript:
+    linter: "eslint"
+    formatter: "prettier"
+    type_checker: "typescript"
+    architecture: "dependency-cruiser"
+```
 
 ============================================================================
 ## 11) EXECUTION PLAYBOOK (AI PHẢI THEO CÁC BƯỚC NÀY MỖI RESPONSE)
@@ -1546,15 +1507,40 @@ app/interfaces/cli/user_cli.py → tests/interfaces/test_user_cli.py
 
 ### STEP 4 — TESTS & TOOLING
 - Provide unit/app/contract/integration test stubs.
-- Emit `pyproject.toml`, `.pre-commit-config.yaml`, `architecture.ini`, `.env.example` as needed.
+- Emit language-specific config files:
+  - **Python**: `pyproject.toml`, `.pre-commit-config.yaml`, `architecture.ini`
+  - **Java**: `pom.xml`, `checkstyle.xml`, `archunit.properties`
+  - **C#**: `.csproj`, `Directory.Build.props`, `stylecop.json`
+  - **TypeScript**: `package.json`, `eslint.config.js`, `dependency-cruiser.js`
+- Always include `.env.example` và quick‑start instructions.
 
 ### STEP 5 — SELF‑CHECK (AUTO‑GATE BEFORE RETURNING CODE)
-- Print a short checklist và mark pass/fail cho:
-  - R‑LEN‑001 (≤100 chars/line), R‑CMP‑010 (complexity), R‑RET‑003 (≤3 returns),
-    R‑ARGS‑006 (≤6 params), R‑FILE‑CLS‑001 (1 public class/file),
-    R‑GLOB‑002 (no globals), R‑DOC‑010 (docstrings/typing), R‑LAY‑ARCH‑100 (imports),
-    R‑DUP‑010 (không tạo trùng file/type/function/module), R‑COMP‑020 (tương thích DI/wiring hiện có),
-    R‑BWC‑030 (không phá vỡ public API trừ khi có migration/notes rõ ràng).
+- Print a short checklist và mark pass/fail cho các rules sau:
+
+#### 5.1 Code Quality Rules
+- **R‑LEN‑001**: Line length ≤ 100 characters
+- **R‑CMP‑010**: Cyclomatic complexity ≤ 10, Cognitive complexity ≤ 15
+- **R‑RET‑003**: ≤ 3 return points per function (guard clauses allowed)
+- **R‑ARGS‑006**: ≤ 6 parameters per function (including `self`/`this`)
+- **R‑NEST‑003**: Nesting depth ≤ 3 levels
+
+#### 5.2 File & Structure Rules  
+- **R‑FILE‑CLS‑001**: One public class per file (private helpers allowed)
+- **R‑GLOB‑002**: No global variables/singletons (use DI)
+- **R‑DUP‑010**: No duplicate files/types/functions/modules
+- **R‑IMPORT‑001**: No wildcard imports, no debug statements in prod
+
+#### 5.3 Documentation & Type Rules
+- **R‑DOC‑010**: All public APIs have docstrings with Purpose/Used by/Reason
+- **R‑TYPE‑001**: Full type annotations for all functions/methods/attributes
+- **R‑IMMUT‑001**: All DTOs/VOs/UI Models are immutable
+
+#### 5.4 Architecture Rules
+- **R‑LAY‑ARCH‑100**: Respect layer boundaries (Domain → Application → Infrastructure → Interfaces)
+- **R‑COMP‑020**: Compatible with existing DI/wiring
+- **R‑BWC‑030**: No breaking changes to public API (unless migration notes provided)
+- **R‑VENDOR‑001**: No vendor types leak beyond infrastructure layer
+
 - Nếu any **must** rule fails, FIX và re‑check before returning.
 
 ### STEP 6 — USAGE & DEMO
@@ -1629,246 +1615,45 @@ app/interfaces/cli/user_cli.py → tests/interfaces/test_user_cli.py
 ## 15) YÊU CẦU DANH SÁCH THƯ VIỆN SỬ DỤNG (LIBRARY REQUIREMENTS)
 
 ### 15.1 Mục Tiêu
-Khi AI tự động thêm thư viện vào dự án, phải cung cấp thông tin chi tiết về từng thư viện để đảm bảo tính minh bạch, khả năng bảo trì và hiểu biết về dependencies.
+Khi AI tự động thêm thư viện vào dự án, phải cung cấp thông tin cần thiết về từng thư viện để đảm bảo tính minh bạch và khả năng bảo trì.
 
-### 15.2 Thông Tin Bắt Buộc Cho Mỗi Thư Viện
+### 15.2 Thông Tin Tối Thiểu Cho Mỗi Thư Viện
 
-#### 15.2.1 Tên Thư Viện
-- **Tên chính thức**: Tên package chính thức trên registry
-- **Tên import**: Tên module khi import trong code
-- **Tên thay thế**: Các tên khác có thể gặp (aliases, nicknames)
-- **Ví dụ**: 
-  - Tên chính thức: `requests`
-  - Tên import: `import requests`
-  - Tên thay thế: `urllib3`, `httpx`
+#### 15.2.1 Thông Tin Cơ Bản
+- **Tên package**: Tên chính thức trên registry
+- **Version**: Version được sử dụng
+- **License**: Loại license (MIT, Apache, GPL, etc.)
+- **Mục đích**: HTTP client, testing framework, data processing, etc.
 
-#### 15.2.2 Cách Cài Đặt
-- **Nguồn cài đặt**: Package registry (npm, Maven, NuGet, Cargo, etc.), GitHub, local build
-- **Lệnh cài đặt**: Package manager specific (`npm install`, `mvn dependency`, `dotnet add`, `cargo add`)
-- **Yêu cầu phần cứng**: RAM, CPU, disk space tối thiểu
-- **Yêu cầu hệ điều hành**: Windows, Linux, macOS compatibility
-- **Yêu cầu language/runtime version**: Minimum version requirements
-- **Dependencies**: Các thư viện phụ thuộc khác
-- **Ví dụ**:
-  ```bash
-  # TypeScript/JavaScript
-  npm install axios@^1.4.0
-  
-  # Java/Maven
-  <dependency>
-      <groupId>com.squareup.okhttp3</groupId>
-      <artifactId>okhttp</artifactId>
-      <version>4.11.0</version>
-  </dependency>
-  
-  # C#/.NET
-  dotnet add package Flurl.Http --version 3.2.4
-  
-  # Yêu cầu hệ thống
-  # RAM: 50MB, CPU: 1 core, Disk: 10MB
-  # OS: Windows 10+, Linux, macOS 10.14+
-  ```
+#### 15.2.2 Lý Do Sử Dụng
+- **Tính năng chính**: Async support, type safety, performance
+- **Ưu điểm**: Thread-safe, well-maintained, good documentation
+- **Tương thích**: Phù hợp với Clean Architecture, không leak vào domain
 
-#### 15.2.3 Tại Sao Phù Hợp
-- **Mục đích sử dụng**: HTTP client, data processing, testing framework
-- **Tính năng chính**: Async support, static typing support, performance
-- **Ưu điểm kỹ thuật**: Memory efficient, thread-safe, well-maintained
-- **Tương thích kiến trúc**: Phù hợp với Clean Architecture, DI pattern
-- **Ví dụ**:
-  ```
-  - Mục đích: HTTP client cho external API calls
-  - Tính năng: Session management, retry logic, timeout handling
-  - Ưu điểm: Thread-safe, memory efficient, well-documented
-  - Tương thích: Phù hợp với infrastructure layer, không leak vào domain
-  ```
+#### 15.2.3 Thay Thế & Rủi Ro
+- **Alternatives**: Các thư viện thay thế chính
+- **Rủi ro**: Security vulnerabilities, breaking changes
+- **Mitigation**: Regular updates, security scanning
 
-#### 15.2.4 Thư Viện Thay Thế
-- **Thư viện chính**: `httpx`, `aiohttp`, `urllib3`
-- **So sánh ngắn gọn**: Performance, features, maintenance
-- **Khi nào dùng thay thế**: Khi cần async, khi cần performance cao
-- **Ví dụ**:
-  ```
-  - httpx: Async support, HTTP/2, modern API
-  - aiohttp: Pure async, WebSocket support
-  - urllib3: Low-level, more control
-  ```
+### 15.3 Format Báo Cáo Đơn Giản
 
-#### 15.2.5 Tự Động Update
-- **Update strategy**: Major, minor, patch updates
-- **Breaking changes**: Cách xử lý breaking changes
-- **Testing**: Cách test sau khi update
-- **Rollback**: Cách rollback nếu có vấn đề
-- **Ví dụ**:
-  ```
-  - Update strategy: Auto patch, manual minor/major
-  - Breaking changes: Test suite, gradual migration
-  - Testing: Unit tests, integration tests
-  - Rollback: Version pinning, dependency lock
-  ```
-
-### 15.3 Format Báo Cáo Thư Viện
-
-#### 15.3.1 Template Báo Cáo
 ```markdown
-## Thư Viện: [Tên Thư Viện]
+## Library: [Name]
 
-### 1. Thông Tin Cơ Bản
-- **Tên chính thức**: [Tên package]
-- **Tên import**: `import [module_name]`
-- **Version**: [version]
-- **License**: [license type]
-
-### 2. Cài Đặt
-- **Nguồn**: [Package registry/GitHub]
-- **Lệnh**: [Package manager install command]
-- **Yêu cầu phần cứng**: [RAM/CPU/Disk]
-- **Yêu cầu OS**: [Windows/Linux/macOS]
-- **Language/Runtime version**: [Minimum version]
-- **Dependencies**: [list dependencies]
-
-### 3. Lý Do Sử Dụng
-- **Mục đích**: [HTTP client, data processing, etc.]
-- **Tính năng**: [Async, static typing, performance]
-- **Ưu điểm kỹ thuật**: [Memory efficient, thread-safe]
-- **Tương thích kiến trúc**: [Clean Architecture, DI pattern]
-
-### 4. Thay Thế
-- **Thư viện chính**: [httpx, aiohttp, urllib3]
-- **So sánh**: [Performance, features, maintenance]
-- **Khi nào dùng**: [Async, performance cao]
-
-### 5. Ưu Nhược Điểm
-- **Ưu điểm**: [Dễ sử dụng, API đơn giản, community lớn]
-- **Nhược điểm**: [Không async, memory cao, không HTTP/2]
-- **Rủi ro**: [Security vulnerabilities, breaking changes]
-- **Mitigation**: [Regular updates, security scanning]
-
-### 6. Update Strategy
-- **Update**: [Auto patch, manual minor/major]
-- **Breaking changes**: [Test suite, gradual migration]
-- **Testing**: [Unit tests, integration tests]
-- **Rollback**: [Version pinning, dependency lock]
+**Package**: [package-name]  
+**Version**: [version]  
+**License**: [license]  
+**Purpose**: [HTTP client, testing, etc.]  
+**Why**: [Key features, advantages]  
+**Alternatives**: [main alternatives]  
+**Risks**: [security, maintenance risks]  
 ```
 
-#### 15.3.2 Ví Dụ Báo Cáo Thực Tế
-
-**Example: HTTP Client Library**
-- **Tên**: axios (TypeScript), okhttp (Java), Flurl (C#)
-- **Mục đích**: HTTP client cho external API calls
-- **Tính năng**: Session management, retry logic, timeout handling
-- **Ưu điểm**: Thread-safe, memory efficient, well-documented
-- **Thay thế**: fetch API, urllib3, HttpClient
-- **Update strategy**: Auto patch, manual minor/major
-
-### 15.4 Quy Tắc Báo Cáo Thư Viện
-
-#### 15.4.1 Bắt Buộc
-- **Mỗi thư viện** phải có đầy đủ 6 thông tin trên
-- **Không được bỏ qua** bất kỳ thông tin nào
-- **Phải cập nhật** khi thêm thư viện mới
-- **Phải review** định kỳ (hàng tháng)
-
-#### 15.4.2 Tự Động Hóa
-- **Tự động generate** báo cáo khi thêm thư viện
-- **Tự động update** thông tin version
-- **Tự động check** security vulnerabilities
-- **Tự động suggest** alternatives
-
-#### 15.4.3 Validation
-- **Kiểm tra** thông tin chính xác
-- **Verify** compatibility với language/runtime version
-- **Check** license compatibility
-- **Validate** security status
-
-### 15.5 Integration Với CI/CD
-
-#### 15.5.1 Automated Library Reporting
-```yaml
-# .github/workflows/library-report.yml
-name: Library Report
-on:
-  schedule:
-    - cron: '0 0 1 * *'  # Monthly
-  push:
-    paths:
-      - 'package.json'
-      - 'package-lock.json'
-
-jobs:
-  library-report:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Generate Library Report
-        run: |
-          npm run generate-library-report
-          npm run check-security-vulnerabilities
-          npm run suggest-alternatives
-```
-
-#### 15.5.2 Library Monitoring
-```typescript
-// scripts/library-monitor.ts
-// Language-agnostic library monitoring example
-export class LibraryMonitor {
-    private libraries: LibraryInfo[] = [];
-    
-    constructor() {
-        this.libraries = this.loadLibraries();
-    }
-    
-    async checkSecurityVulnerabilities(): Promise<void> {
-        // Check security vulnerabilities for each library
-        for (const lib of this.libraries) {
-            const response = await fetch(`${lib.registryUrl}/${lib.name}/json`);
-            if (response.ok) {
-                const data = await response.json();
-                this.reportSecurityIssues(lib, data);
-            }
-        }
-    }
-    
-    suggestAlternatives(): void {
-        // Suggest alternative libraries
-        for (const lib of this.libraries) {
-            const alternatives = this.findAlternatives(lib);
-            this.reportAlternatives(lib, alternatives);
-        }
-    }
-    
-    generateReport(): void {
-        // Generate comprehensive library report
-        const report = {
-            timestamp: new Date().toISOString(),
-            libraries: this.libraries,
-            securityIssues: this.checkSecurityVulnerabilities(),
-            alternatives: this.suggestAlternatives()
-        };
-        
-        // Write report to file
-        this.writeReportToFile(report);
-    }
-}
-```
-
-### 15.6 Best Practices
-
-#### 15.6.1 Library Selection
-- **Ưu tiên** thư viện có community lớn
-- **Chọn** thư viện có documentation tốt
-- **Tránh** thư viện deprecated hoặc không maintain
-- **Kiểm tra** license compatibility
-
-#### 15.6.2 Version Management
-- **Pin** version chính xác
-- **Update** thường xuyên
-- **Test** sau mỗi update
-- **Rollback** nếu có vấn đề
-
-#### 15.6.3 Security
-- **Scan** security vulnerabilities
-- **Update** thường xuyên
-- **Monitor** security advisories
-- **Implement** security best practices
+### 15.4 Best Practices
+- **Minimal dependencies**: Chỉ thêm thư viện thực sự cần thiết
+- **Version pinning**: Pin version chính xác trong lockfile
+- **Security scanning**: Regular vulnerability checks
+- **Documentation**: Document lý do sử dụng mỗi thư viện
 
 ============================================================================
 ## 16) GROUND RULES
