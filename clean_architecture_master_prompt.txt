@@ -25,7 +25,7 @@ một **skeleton dự án production-grade** với code, wiring, tests, docs stu
 tuân thủ nghiêm ngặt backbone này. Nếu có gì mơ hồ, chỉ hỏi **một** câu hỏi làm rõ duy nhất nếu nó
 chặn tính chính xác; nếu không thì chọn safe defaults bảo toàn backbone.
 
-> **🔧 LANGUAGE-AGNOSTIC**: Prompt này được thiết kế cho **mọi ngôn ngữ hiện đại** với static typing.
+> ** LANGUAGE-AGNOSTIC**: Prompt này được thiết kế cho **mọi ngôn ngữ hiện đại** với static typing.
 > Các ví dụ code sử dụng TypeScript, Java, C# - áp dụng patterns tương tự cho ngôn ngữ của bạn.
 > Nguyên tắc kiến trúc áp dụng cho TypeScript, Java, C#, Kotlin, Rust, Go, Swift, etc.
 
@@ -57,22 +57,22 @@ chặn tính chính xác; nếu không thì chọn safe defaults bảo toàn bac
 
 #### 2.1.3 Dependency Rule (Bất Biến)
 ```
-┌─────────────────────────────────────────────┐
-│            Interfaces (UI/API/CLI)          │ ← Entry points
-├─────────────────────────────────────────────┤
-│          Infrastructure (Adapters)          │ ← External integrations
-├─────────────────────────────────────────────┤
-│        Application (Use Cases, Ports)       │ ← Orchestration
-├─────────────────────────────────────────────┤
-│      Domain (Entities, VOs, Services)       │ ← Core business logic
-└─────────────────────────────────────────────┘
 
-DEPENDENCY FLOW: ──────────────────────────────►
+            Interfaces (UI/API/CLI)           ← Entry points
+
+          Infrastructure (Adapters)           ← External integrations
+
+        Application (Use Cases, Ports)        ← Orchestration
+
+      Domain (Entities, VOs, Services)        ← Core business logic
+
+
+DEPENDENCY FLOW: 
                  (Từ ngoài vào trong)
 
-❌ Domain KHÔNG BAO GIỜ depend vào Application/Infrastructure/Interfaces
-❌ Application KHÔNG BAO GIỜ depend vào Infrastructure/Interfaces
-✅ Infrastructure/Interfaces depend vào Application/Domain (via ports)
+ Domain KHÔNG BAO GIỜ depend vào Application/Infrastructure/Interfaces
+ Application KHÔNG BAO GIỜ depend vào Infrastructure/Interfaces
+ Infrastructure/Interfaces depend vào Application/Domain (via ports)
 ```
 
 ### 2.2 Key Patterns
@@ -104,7 +104,7 @@ DEPENDENCY FLOW: ─────────────────────
 
 ### 2.3 Common Violations to Avoid
 
-| ❌ Violation | ✅ Correct Approach |
+|  Violation |  Correct Approach |
 |-------------|---------------------|
 | Import requests trong Domain | Define port trong Application, implement trong Infrastructure |
 | Entity có method `save()` | Repository pattern với port interface |
@@ -139,7 +139,7 @@ DEPENDENCY FLOW: ─────────────────────
 ### 3.2 Cấu Trúc Core Application
 ```
 app/
-  domain/                           # 🎯 CORE BUSINESS LOGIC (Layer 1 - Innermost)
+  domain/                           #  CORE BUSINESS LOGIC (Layer 1 - Innermost)
     enums/                          # Business enums (OrderStatus, UserRole)
     value_objects/                  # Immutable values (Money, Email, Coordinates)
     entities/                       # Business entities (User, Order, Product)
@@ -147,22 +147,22 @@ app/
     constants/                      # Business constants (KHÔNG URL, KHÔNG vendor)
     errors                           # Domain exceptions
 
-  application/                      # 🔧 USE CASES & ORCHESTRATION (Layer 2)
-    ports/                          # 📡 Protocols/Interfaces: repositories, gateways, services
+  application/                      #  USE CASES & ORCHESTRATION (Layer 2)
+    ports/                          #  Protocols/Interfaces: repositories, gateways, services
     dto/                            # Data Transfer Objects: Command, Query, Response DTOs
     use_cases/                      # Business use cases (CreateUser, ProcessOrder)
     constants/                      # App defaults: paging, retry, UI schema (vendor-agnostic)
     errors                           # Application exceptions
 
-  infrastructure/                   # 🔌 EXTERNAL INTEGRATIONS (Layer 3)
+  infrastructure/                   #  EXTERNAL INTEGRATIONS (Layer 3)
     http/                           # HTTP client foundation
       http_method                   # HTTP method enum
       request_entity                # Generic HTTP request entity
       client                        # Base HTTP client
       middlewares/                  # retry, circuit-breaker, auth, logging
     
-    <provider_name>/                # 🌐 Provider-specific (e.g., tomtom/, stripe/, google/)
-      acl/                          # 🛡️ Anti-Corruption Layer: mappers/translators
+    <provider_name>/                #  Provider-specific (e.g., tomtom/, stripe/, google/)
+      acl/                          #  Anti-Corruption Layer: mappers/translators
       dto/                          # Provider-specific request/response DTOs
       adapters/                     # Implement application.ports.* interfaces
       constants/                    # Provider URLs/paths/versions (KHÔNG trong endpoint)
@@ -176,21 +176,21 @@ app/
     constants/                      # Infra defaults (timeouts, headers) - NOT provider-specific
     observability/                  # OpenTelemetry, tracing, metrics (optional)
 
-  interfaces/                       # 🚪 ENTRY POINTS (Layer 4 - Outermost)
+  interfaces/                       #  ENTRY POINTS (Layer 4 - Outermost)
     mcp/                            # MCP tool/server handlers
     rest/                           # REST API (FastAPI, Flask) - optional
     cli/                            # CLI commands (Typer, Click) - optional
     graphql/                        # GraphQL API - optional
     constants/                      # UI-facing defaults (display formats, page sizes)
 
-  di/                               # 🏗️ DEPENDENCY INJECTION
+  di/                               #  DEPENDENCY INJECTION
     container                       # Main DI container & registration
     providers                       # Provider registration functions (optional split)
 ```
 
 ### 3.3 Cấu Trúc Hỗ Trợ
 ```
-tests/                              # 🧪 TESTING
+tests/                              #  TESTING
   domain/                           # Unit tests (no I/O, pure logic)
   application/                      # Use case tests (mocked ports)
   infrastructure/                   # Adapter/integration tests
@@ -198,7 +198,7 @@ tests/                              # 🧪 TESTING
   fixtures/                         # Shared test fixtures
   conftest                         # Test configuration
 
-docs/                               # 📚 DOCUMENTATION
+docs/                               #  DOCUMENTATION
   adr/                              # Architecture Decision Records
   api/                              # API documentation (OpenAPI/Swagger)
   architecture/                     # Architecture diagrams
@@ -206,12 +206,12 @@ docs/                               # 📚 DOCUMENTATION
   CHANGELOG.md                      # Version history
   CONTRIBUTING.md                   # Contribution guidelines
 
-scripts/                            # 🛠️ UTILITY SCRIPTS
+scripts/                            #  UTILITY SCRIPTS
   setup                           # Environment setup
   migrate                         # Database migrations
   seed                            # Data seeding
 
-.github/                            # ⚙️ CI/CD
+.github/                            #  CI/CD
   workflows/                        # GitHub Actions workflows
     test.yml                        # Test pipeline
     lint.yml                        # Linting
@@ -252,7 +252,7 @@ Interface constants  → app/interfaces/constants/ (UI defaults)
 ============================================================================
 ## 4) TIÊU CHUẨN CODE & QUY ƯỚC (CÓ THỂ THỰC THI)
 
-### 4.1 🌟 LUẬT CHUNG (General Rules) - Áp dụng cho TẤT CẢ Layers
+### 4.1  LUẬT CHUNG (General Rules) - Áp dụng cho TẤT CẢ Layers
 
 #### 4.1.1 Nguyên Tắc Cơ Bản
 - **Immutability:** Tất cả data models PHẢI immutable để đảm bảo thread-safety và predictability
@@ -279,7 +279,7 @@ Interface constants  → app/interfaces/constants/ (UI defaults)
 
 ---
 
-### 4.2 🏗️ LUẬT RIÊNG (Layer-Specific Rules)
+### 4.2  LUẬT RIÊNG (Layer-Specific Rules)
 
 #### 4.2.1 Domain Layer - Business Logic
 **Pattern:** `{Entity}`, `{ValueObject}`, `{Entity}Event`
@@ -333,7 +333,7 @@ Interface constants  → app/interfaces/constants/ (UI defaults)
 
 ---
 
-### 4.3 🎯 QUICK REFERENCE (Tra Cứu Nhanh)
+### 4.3  QUICK REFERENCE (Tra Cứu Nhanh)
 
 **Sử dụng bảng này khi cần tra cứu nhanh cách đặt tên. Chi tiết đầy đủ ở sections trên.**
 
@@ -414,58 +414,58 @@ CreateUserCommandV1Dto            → Versioned command (V1)
 
 ---
 
-### 4.4 ⚠️ CRITICAL RULES & CONSTRAINTS (BẮT BUỘC)
+### 4.4  CRITICAL RULES & CONSTRAINTS (BẮT BUỘC)
 
 #### 4.4.1 BẮT BUỘC (REQUIRED)
 ```
-✅ ALWAYS immutable                → All DTOs, VOs, UI Models
-✅ ALWAYS documentation            → Every DTO/UI Model must explain Purpose/Used by/Reason
-✅ ALWAYS type annotations         → Full static typing
-✅ ALWAYS immutable collections    → Use immutable/readonly collections
-✅ ALWAYS separate layers          → No Entity as Dto, no cross-layer reuse
-✅ ALWAYS ISO-8601                 → Datetime at all boundaries
-✅ UI Models NO "Dto" suffix       → UserUiModel (NOT UserUiModelDto)
+ ALWAYS immutable                → All DTOs, VOs, UI Models
+ ALWAYS documentation            → Every DTO/UI Model must explain Purpose/Used by/Reason
+ ALWAYS type annotations         → Full static typing
+ ALWAYS immutable collections    → Use immutable/readonly collections
+ ALWAYS separate layers          → No Entity as Dto, no cross-layer reuse
+ ALWAYS ISO-8601                 → Datetime at all boundaries
+ UI Models NO "Dto" suffix       → UserUiModel (NOT UserUiModelDto)
 ```
 
 #### 4.4.2 NGHIÊM CẤM (FORBIDDEN)
 ```
-❌ NEVER Entity as Dto             → Separate types always
-❌ NEVER mutable collections       → Use immutable/readonly collections
-❌ NEVER skip immutability         → For DTOs/VOs/UI Models
-❌ NEVER skip documentation        → Explain every DTO/UI Model
-❌ NEVER vendor types in Domain    → Keep domain pure
-❌ NEVER "Dto" suffix for UI       → UI Models are view models, not DTOs
+ NEVER Entity as Dto             → Separate types always
+ NEVER mutable collections       → Use immutable/readonly collections
+ NEVER skip immutability         → For DTOs/VOs/UI Models
+ NEVER skip documentation        → Explain every DTO/UI Model
+ NEVER vendor types in Domain    → Keep domain pure
+ NEVER "Dto" suffix for UI       → UI Models are view models, not DTOs
 ```
 
 #### 4.4.3 Ràng Buộc Kiến Trúc (Architecture Constraints)
 
-**🚫 NGHIÊM CẤM (FORBIDDEN):**
+** NGHIÊM CẤM (FORBIDDEN):**
 
 1. **Không tái dùng Entity làm Dto**
    - Entity và DTO phải tách biệt hoàn toàn
    - Lý do: Tránh rò dữ liệu nội bộ/PII, tách persistence schema khỏi API contract
-   - ❌ BAD: Return Entity directly from service
-   - ✅ GOOD: Map Entity to DTO before returning
+   -  BAD: Return Entity directly from service
+   -  GOOD: Map Entity to DTO before returning
 
 2. **Không để Domain/Application phụ thuộc vào provider/vendor types**
    - Domain/Application KHÔNG được import types từ external libraries
    - Lý do: Bảo vệ business logic khỏi vendor lock-in
-   - ❌ BAD: Domain depends on external library types
-   - ✅ GOOD: Domain uses own value objects
+   -  BAD: Domain depends on external library types
+   -  GOOD: Domain uses own value objects
 
 3. **Không dùng mutable collections trong DTOs**
    - Prefer immutable collections (tuple, frozenset) thay vì mutable (list, set)
    - Lý do: Immutability prevents accidental mutations
-   - ❌ BAD: Use mutable collections in DTOs
-   - ✅ GOOD: Use immutable collections
+   -  BAD: Use mutable collections in DTOs
+   -  GOOD: Use immutable collections
 
 4. **Không skip immutability cho DTOs**
    - Tất cả DTO/VO PHẢI dùng immutable data structures
    - Lý do: Immutability ensures data integrity across boundaries
-   - ❌ BAD: Mutable DTOs
-   - ✅ GOOD: Immutable DTOs with language-specific patterns
+   -  BAD: Mutable DTOs
+   -  GOOD: Immutable DTOs with language-specific patterns
 
-**✅ BẮT BUỘC (REQUIRED):**
+** BẮT BUỘC (REQUIRED):**
 
 1. **DTO provider chỉ nằm ở:**
    - `infrastructure/<provider>/acl/` - Mappers/translators cho external providers
@@ -492,7 +492,7 @@ CreateUserCommandV1Dto            → Versioned command (V1)
    - Mappings: `MappingProxyType` hoặc `dict` với frozen dataclass
    - Strings/primitives: Already immutable
 
-**📋 PATTERNS TO FOLLOW:**
+** PATTERNS TO FOLLOW:**
 
 1. **CQRS Pattern trong DTOs:**
    - Commands: Mutate state → `{Action}{Entity}CommandDto`
@@ -524,7 +524,7 @@ CreateUserCommandV1Dto            → Versioned command (V1)
 
 ---
 
-### 4.5 📋 Tiêu Chuẩn Code Chung
+### 4.5  Tiêu Chuẩn Code Chung
 
 #### Language & Type Safety
 - **Modern statically-typed language** (e.g., TypeScript, Java, C#, Kotlin, Rust, Go, Swift)
@@ -536,7 +536,7 @@ CreateUserCommandV1Dto            → Versioned command (V1)
   - Bất kỳ data structure nào cross boundaries giữa các layers
   
   ```typescript
-  // ✅ CORRECT - Immutable DTOs (TypeScript)
+  //  CORRECT - Immutable DTOs (TypeScript)
   interface CreateUserCommandDto {
       readonly name: string;
       readonly email: string;
@@ -554,7 +554,7 @@ CreateUserCommandV1Dto            → Versioned command (V1)
   ```
   
   ```java
-  // ✅ CORRECT - Immutable DTOs (Java with records)
+  //  CORRECT - Immutable DTOs (Java with records)
   public record CreateUserCommandDto(String name, String email) {}
   public record Money(BigDecimal amount, String currency) {}
   public record UserUiModel(String displayName, String email) {}
@@ -565,7 +565,7 @@ CreateUserCommandV1Dto            → Versioned command (V1)
   - Internal helpers/builders (không cross boundaries)
   
   ```typescript
-  // ✅ OK - Entity có thể mutable
+  //  OK - Entity có thể mutable
   class User {
       private id: UserId;
       private name: string;
@@ -616,11 +616,11 @@ CreateUserCommandV1Dto            → Versioned command (V1)
 
 ---
 
-### 4.6 📋 EXAMPLES & PATTERNS (Ví Dụ Thực Tế)
+### 4.6  EXAMPLES & PATTERNS (Ví Dụ Thực Tế)
 
 **Example 1: Command DTO với đầy đủ documentation**
 
-> 💡 **Language-Agnostic Examples**: Các ví dụ dưới đây sử dụng TypeScript, Java, C# syntax.
+>  **Language-Agnostic Examples**: Các ví dụ dưới đây sử dụng TypeScript, Java, C# syntax.
 > Áp dụng patterns tương tự cho ngôn ngữ của bạn với syntax phù hợp.
 
 ```typescript
@@ -772,7 +772,7 @@ public record StripePaymentRequestDto(
 }
 ```
 
-> 💡 **Lưu ý**: Tham khảo thêm các ví dụ khác (Query DTO, Response DTO, UI Model, Event DTO) 
+>  **Lưu ý**: Tham khảo thêm các ví dụ khác (Query DTO, Response DTO, UI Model, Event DTO) 
 > trong documentation hoặc examples repository khi cần.
 
 
@@ -991,7 +991,7 @@ Hỗ trợ **type safety** và **validation** cho tất cả constants.
 3. Constants files (default fallback)
 ```
 
-> ⚠️ Constants are **defaults only**. Always support override via configuration.
+>  Constants are **defaults only**. Always support override via configuration.
 
 #### 5.5.2 Import Patterns
 - **Domain layer**: Only domain constants
@@ -1009,7 +1009,7 @@ Hỗ trợ **type safety** và **validation** cho tất cả constants.
 - **Environment Override**: Allow runtime override via ENV
 
 #### 5.5.4 Language-Specific Implementation
-> 💡 **Note**: Implement constants using your language's preferred pattern:
+>  **Note**: Implement constants using your language's preferred pattern:
 > - **TypeScript**: `const` or `enum`
 > - **Java**: `static final` or `enum`  
 > - **C#**: `const` or `static readonly`
@@ -1375,7 +1375,7 @@ app/interfaces/cli/user_cli.py → tests/interfaces/test_user_cli.py
 ## 10) TOOLING & CẤU HÌNH
 
 ### 10.1 Core Tooling (Language-Agnostic)
-> **🌐 LANGUAGE-AGNOSTIC TOOLING**: Các tooling được liệt kê dưới đây áp dụng cho **mọi ngôn ngữ hiện đại**.
+> ** LANGUAGE-AGNOSTIC TOOLING**: Các tooling được liệt kê dưới đây áp dụng cho **mọi ngôn ngữ hiện đại**.
 > Mỗi ngôn ngữ có ecosystem tương ứng:
 
 #### 10.1.1 Python Ecosystem
@@ -1663,9 +1663,9 @@ Khi AI tự động thêm thư viện vào dự án, phải cung cấp thông ti
 
 ---
 
-## 📋 TÓM TẮT LANGUAGE-AGNOSTIC ARCHITECTURE
+##  TÓM TẮT LANGUAGE-AGNOSTIC ARCHITECTURE
 
-> **🎯 LƯU Ý CUỐI CÙNG**: Prompt này được thiết kế cho **mọi ngôn ngữ hiện đại** với:
+> ** LƯU Ý CUỐI CÙNG**: Prompt này được thiết kế cho **mọi ngôn ngữ hiện đại** với:
 > - **Code examples**: TypeScript, Java, C# syntax và patterns
 > - **Tooling**: Language-agnostic ecosystem (ESLint, SonarQube, Jest, etc.)
 > - **Dependencies**: Multi-language packages (axios, okhttp, Flurl, etc.)
